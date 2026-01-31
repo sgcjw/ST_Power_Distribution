@@ -18,18 +18,26 @@ extern "C" {
 
 // ADD YOUR INCLUDES HERE
 #include "Test/SSD1306/ssd1306.h"
+#include "Test/INA228.h"
 
 void user_setup();
 void user_loop();
 void user_error_handler();
 
 // ADD OTHER HELPER FUNCTIONS HERE
+void Automated_Check();
+uint16_t OC_check();
 void ssd1306_DisplayData();
 void ssd1306_DisplayOnMsg();
-void ssd1306_DisplayOffMsg();
+void ssd1306_DisplayReadyMsg();
+void ssd1306_DisplayErrorMsg();
+void ssd1306_DisplayENTestMsg();
+void ssd1306_DisplayOCTestMsg();
+
 
 #define SCREEN_TIMER 500  // Screen update interval in milliseconds
 #define HB_TIMER 1000  // Heartbeat interval in milliseconds
+#define MONITOR_TIMER 100 // Monitor interval in milliseconds
 
 #ifdef __cplusplus
 }
