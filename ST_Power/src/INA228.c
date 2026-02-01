@@ -15,14 +15,40 @@
  * @brief:		Read a register from the IN228 sensor.
  * @param:		Pointer to the device object that was made from the struct. EX:  (&ina228)
  * @param:		register address in hexadecimal
- * @retval:		16 bit unsigned integer that represents the register's contents.
+ * @retval:		24 bit/16 bit unsigned integer that represents the register's contents.
  */
+
 uint16_t Read16(INA228_t *ina228, uint8_t Register)
 {
 	uint8_t Value[2];
 
-	HAL_I2C_Mem_Read(ina228->ina228_i2c, (ina228->Address<<1), Register, 1, Value, 2, 1000);
-	return ((Value[0] << 8) | Value[1]);
+	HAL_I2C_Mem_Read(ina228->ina228_i2c,
+					 (ina228->Address << 1),
+					 Register,
+					 I2C_MEMADD_SIZE_8BIT,
+					 Value,
+					 2,
+					 1000);
+
+	return ((uint16_t)Value[0] << 8) |
+		   (uint16_t)Value[1];
+}
+
+uint32_t Read24(INA228_t *ina228, uint8_t Register)
+{
+    uint8_t Value[3];
+
+    HAL_I2C_Mem_Read(ina228->ina228_i2c,
+                     (ina228->Address << 1),
+                     Register,
+                     I2C_MEMADD_SIZE_8BIT,
+                     Value,
+                     3,
+                     1000);
+
+    return ((uint32_t)Value[0] << 16) |
+           ((uint32_t)Value[1] << 8)  |
+           (uint32_t)Value[2];
 }
 
 /*
@@ -73,22 +99,23 @@ uint16_t INA228_Init(INA228_t *ina228, I2C_HandleTypeDef *i2c, uint8_t Address, 
  * @param:		Pointer to the device object that was made from the struct. EX:  (&ina228)
  * @retval:		Returns voltage level in mili-volts
  */
-uint16_t INA228_ReadBusVoltage(INA228_t *ina228)
+float INA228_ReadBusVoltage(INA228_t *ina228)
 {
-	uint16_t result = Read16(ina228, INA228_BUS_VOLTAGE);
-
-	return (result * 195.3125e-3); // each bit is 195.3125uV
-
+	//  always positive, remove reserved bits.
+  	uint32_t value = Read24(ina228, INA228_BUS_VOLTAGE) >> 4;
+  	float bus_LSB = 195.3125e-3;  //  195.3125 uV
+  	float voltage = value * bus_LSB;
+  	return voltage;
 }
 
 /*
- *  @brief:	  	Gets the raw current value (16-bit signed integer, so +-32767)
+ *  @brief:	  	Gets the raw current value (24-bit signed integer, so +-8388607)
  *  @param:		Pointer to the device object that was made from the struct. EX:  (&ina228)
  *  @retval:	The raw current reading
  */
-int16_t INA228_ReadCurrent_raw(INA228_t *ina228)
+uint32_t INA228_ReadCurrent_raw(INA228_t *ina228)
 {
-	int16_t result = Read16(ina228, INA228_CURRENT);
+	uint32_t result = Read24(ina228, INA228_CURRENT) >> 4; // shift right by 4 bits to remove reserved bits
 
 	return (result);
 }
@@ -99,12 +126,12 @@ int16_t INA228_ReadCurrent_raw(INA228_t *ina228)
  * @param:		Pointer to the device object that was made from the struct. EX:  (&ina228)
  * @return: 	The current reading convereted to milliamps
  */
-int16_t INA228_ReadCurrent(INA228_t *ina228, float maxCurrent)
+float INA228_ReadCurrent(INA228_t *ina228, float maxCurrent)
 {
-	int16_t result = INA228_ReadCurrent_raw(ina228);
+	uint32_t result = INA228_ReadCurrent_raw(ina228);
 
-	// Calculate current_LSB based on maxCurrent
-    float current_LSB = maxCurrent * 1.9073486328125e-6;  //  pow(2, -19);
+	// Calculate current_LSB in mA based on maxCurrent
+    float current_LSB = maxCurrent * 1.9073486328125e-3;  //  pow(2, -19) *1000 to convert to mA;
 
 	return (result * current_LSB); // current is the raw current times the current_LSB
 }
@@ -116,9 +143,9 @@ int16_t INA228_ReadCurrent(INA228_t *ina228, float maxCurrent)
  * 				between the voltage of the power supply and the bus voltage after the shunt
  * 				resistor.
  */
-uint16_t INA228_ReadShuntVoltage(INA228_t *ina228)
+float INA228_ReadShuntVoltage(INA228_t *ina228)
 {
-	uint16_t result = Read16(ina228, INA228_SHUNT_VOLTAGE);
+	uint32_t result = Read24(ina228, INA228_SHUNT_VOLTAGE);
 
 	return (result * 0.01 );
 }
@@ -128,9 +155,9 @@ uint16_t INA228_ReadShuntVoltage(INA228_t *ina228)
  * @param:	Pointer to the device object that was made from the struct. EX:  (&ina228)
  * @retval:	Returns power level in mili-watts
  */
-uint16_t INA228_ReadPower(INA228_t *ina228)
+uint32_t INA228_ReadPower(INA228_t *ina228)
 {
-	uint16_t result = Read16(ina228, INA228_POWER );
+	uint32_t result = Read24(ina228, INA228_POWER );
 	result = result * ina228_powerMultiplier_mW; // power is the power register times the power_LSB (power multiplier)
 	return (result);
 }
@@ -143,7 +170,7 @@ float INA228_getTemperature(INA228_t *ina228)
 }
 
 uint16_t INA228_getDieID(INA228_t *ina228){
-	return (Read16(ina228, INA228_DEVICE_ID)>> 4) & 0x0FFF;
+	return (Read24(ina228, INA228_DEVICE_ID)>> 4) & 0x0FFF;
 }
 
 /*

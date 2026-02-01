@@ -18,8 +18,8 @@ uint8_t ina228_address = 0x40;
 float maxcurrent = 30.0;
 float shunt = 0.004f;
 uint16_t id = 0;
-int16_t current = 0;
-uint16_t voltage = 0;
+float current = 0;
+float voltage = 0;
 uint16_t temp = 0;
 uint16_t oc = 0;
 

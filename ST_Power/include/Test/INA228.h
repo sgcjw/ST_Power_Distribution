@@ -141,17 +141,16 @@ uint16_t INA228_Init(INA228_t *ina228, I2C_HandleTypeDef *i2c, uint8_t Address, 
 //  CORE FUNCTIONS + scale wrappers.
 //
 //       BUS VOLTAGE
-uint16_t INA228_ReadBusVoltage(INA228_t *ina228);
+float INA228_ReadBusVoltage(INA228_t *ina228);
 
 //       SHUNT VOLTAGE
-uint16_t INA228_ReadShuntVoltage(INA228_t *ina228);
+float INA228_ReadShuntVoltage(INA228_t *ina228);
 
 //       SHUNT CURRENT
-int16_t INA228_ReadCurrent_raw(INA228_t *ina228);
-int16_t INA228_ReadCurrent(INA228_t *ina228, float maxCurrent);
-
+uint32_t INA228_ReadCurrent_raw(INA228_t *ina228);
+float INA228_ReadCurrent(INA228_t *ina228, float maxCurrent);
 //       POWER
-uint16_t INA228_ReadPower(INA228_t *ina228);
+uint32_t INA228_ReadPower(INA228_t *ina228);
 
 //       TEMPERATURE
 float   INA228_getTemperature(INA228_t *ina228);    //  Celsius
