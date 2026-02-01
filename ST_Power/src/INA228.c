@@ -145,9 +145,9 @@ float INA228_ReadCurrent(INA228_t *ina228, float maxCurrent)
  */
 float INA228_ReadShuntVoltage(INA228_t *ina228)
 {
-	uint32_t result = Read24(ina228, INA228_SHUNT_VOLTAGE);
+	uint32_t result = Read24(ina228, INA228_SHUNT_VOLTAGE) >> 4; // shift right by 4 bits to remove reserved bits
 
-	return (result * 0.01 );
+	return (result * 312.5e-6); // shunt voltage in mV is the register value times the shunt_LSB (312.5nV)
 }
 /*
  * @brief: 	This reads the power register then multiplies it by the power multiplier.

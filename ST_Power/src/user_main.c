@@ -20,6 +20,7 @@ float shunt = 0.004f;
 uint16_t id = 0;
 float current = 0;
 float voltage = 0;
+// float shunt_voltage = 0;
 uint16_t temp = 0;
 uint16_t oc = 0;
 
@@ -48,8 +49,9 @@ void user_loop()
         // PG = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7);
         // FAULT = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0);
         id = INA228_getDieID(&ina228);
-        current = INA228_ReadCurrent(&ina228, maxcurrent);
+        current = INA228_ReadCurrent(&ina228, maxcurrent); // Subtract 450mA offset for more accurate readings
         voltage = INA228_ReadBusVoltage(&ina228);
+        // shunt_voltage = INA228_ReadShuntVoltage(&ina228)/0.004f;
         temp = INA228_getTemperature(&ina228);
         oc = OC_check();
     }
@@ -130,21 +132,28 @@ void ssd1306_DisplayData() {
 	ssd1306_WriteString("Voltage:", Font_6x8, Black);
 	integer = (int) voltage/1000;
 	fraction = (int)(voltage - integer*1000);
-    snprintf(buff, sizeof(buff), "%d.%02d V", integer, fraction);
+    snprintf(buff, sizeof(buff), "%d.%03d V", integer, fraction);
     ssd1306_WriteString(buff, Font_6x8, Black);
+
+    // ssd1306_SetCursor(2,20);
+	// ssd1306_WriteString("Shunt:", Font_6x8, Black);
+	// integer = (int) shunt_voltage/1000;
+    // fraction = (int)(shunt_voltage - integer*1000);
+    // snprintf(buff, sizeof(buff), "%d.%02d V", integer, fraction);
+    // ssd1306_WriteString(buff, Font_6x8, Black);
 
     ssd1306_SetCursor(2,30);
 	ssd1306_WriteString("Current:", Font_6x8, Black);
 	integer = (int) current/1000;
 	fraction = (int)(current - integer*1000);
-    snprintf(buff, sizeof(buff), "%d.%02d A", integer, fraction);
+    snprintf(buff, sizeof(buff), "%d.%03d A", integer, fraction);
     ssd1306_WriteString(buff, Font_6x8, Black);
 
     ssd1306_SetCursor(2,40);
 	ssd1306_WriteString("Temperature:", Font_6x8, Black);
 	integer = (int) temp/1000;
 	fraction = (int)((temp - integer*1000));
-    snprintf(buff, sizeof(buff), "%d.%02d C", integer, fraction);
+    snprintf(buff, sizeof(buff), "%d.%03d C", integer, fraction);
     ssd1306_WriteString(buff, Font_6x8, Black);
 
     ssd1306_SetCursor(2,50);
