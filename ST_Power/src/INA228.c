@@ -142,6 +142,10 @@ float INA228_getTemperature(INA228_t *ina228)
   return value * LSB;
 }
 
+uint16_t INA228_getDieID(INA228_t *ina228){
+	return (Read16(ina228, INA228_DEVICE_ID)>> 4) & 0x0FFF;
+}
+
 /*
  * @brief: get Delta time in mili-seconds which is the difference between the last time you called this function and now
  */

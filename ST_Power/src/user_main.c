@@ -10,11 +10,14 @@ uint32_t monitor_timer = 0;
 
 bool PG = false;
 bool FAULT = false;
+bool EN_TEST = false;
+bool OC_TEST = false;
 
 INA228_t *ina228;
 uint8_t ina228_address = 0x40;
 float maxcurrent = 30.0;
 float shunt = 0.004f;
+uint16_t id = 0;
 int16_t current = 0;
 uint16_t voltage = 0;
 uint16_t temp = 0;
@@ -29,7 +32,8 @@ void user_setup()
     if (INA228_Init(&ina228, &hi2c1, ina228_address, maxcurrent, shunt) == 1) {
         ssd1306_DisplayReadyMsg();
     }
-    //Automated_Check();
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET); // Remove the OC fault condition
+    Automated_Check();
 }
 
 void user_loop()
@@ -41,8 +45,9 @@ void user_loop()
     }
     if (HAL_GetTick() - monitor_timer > MONITOR_TIMER) {
         monitor_timer = HAL_GetTick();
-        PG = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7);;
-        FAULT = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0);
+        // PG = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7);
+        // FAULT = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0);
+        id = INA228_getDieID(&ina228);
         current = INA228_ReadCurrent(&ina228, maxcurrent);
         voltage = INA228_ReadBusVoltage(&ina228);
         temp = INA228_getTemperature(&ina228);
@@ -59,16 +64,25 @@ void Automated_Check() {
     // Implement automated checks needed at startup
     ssd1306_DisplayENTestMsg();
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET); // Set PA5 high to enable relay
-    HAL_Delay(100); // Wait for relay to turn on
+    HAL_Delay(500); // Wait for relay to turn on
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET); // Set PA5 low to test latching functionality
+    HAL_Delay(500); // Wait for relay to latch
     if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7) == GPIO_PIN_RESET) {
         user_error_handler(); // Relay did not enable successfully, handle error
     }
+    else{
+        EN_TEST = true;
+        ssd1306_DisplayENTestMsg();
+    }
     ssd1306_DisplayOCTestMsg();
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET); // Set PA6 high to trigger OC Test
-    HAL_Delay(100); // Wait for OC test to register
+    HAL_Delay(500); // Wait for OC test to register
     if ((HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0) == GPIO_PIN_RESET) || (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7) == GPIO_PIN_SET)) {
         user_error_handler(); // Proetction did not trigger, handle error
+    }
+    else{
+        OC_TEST = true;
+        ssd1306_DisplayOCTestMsg();
     }
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET); // Reset OC Test
 }
@@ -92,16 +106,23 @@ void ssd1306_DisplayData() {
 	char buff[64];
 	uint16_t integer, fraction;
 	ssd1306_Fill(White);
-	ssd1306_SetCursor(2,5);
-	ssd1306_WriteString("PG:  ", Font_6x8, Black);
-    integer = PG ? 1 : 0;
-    snprintf(buff, sizeof(buff), "%d", integer);
-    ssd1306_WriteString(buff, Font_6x8, Black);
+
+	// ssd1306_SetCursor(2,5);
+	// ssd1306_WriteString("PG:  ", Font_6x8, Black);
+    // integer = PG ? 1 : 0;
+    // snprintf(buff, sizeof(buff), "%d", integer);
+    // ssd1306_WriteString(buff, Font_6x8, Black);
 
 
-    ssd1306_SetCursor(70,5);
-	ssd1306_WriteString("Fault:  ", Font_6x8, Black);
-    integer = FAULT ? 1 : 0;
+    // ssd1306_SetCursor(70,5);
+	// ssd1306_WriteString("Fault:  ", Font_6x8, Black);
+    // integer = FAULT ? 1 : 0;
+    // snprintf(buff, sizeof(buff), "%d", integer);
+    // ssd1306_WriteString(buff, Font_6x8, Black);
+
+    ssd1306_SetCursor(2,5);
+	ssd1306_WriteString("Board ID:  ", Font_6x8, Black);
+    integer = id;
     snprintf(buff, sizeof(buff), "%d", integer);
     ssd1306_WriteString(buff, Font_6x8, Black);
 
@@ -225,7 +246,12 @@ void ssd1306_DisplayErrorMsg() {
 void ssd1306_DisplayENTestMsg() {
     ssd1306_Fill(White);
     ssd1306_SetCursor(2,31);
-	ssd1306_WriteString("TESTING EN", Font_6x8, Black);
+    if (EN_TEST){
+        ssd1306_WriteString("TESTING EN: PASS", Font_6x8, Black);
+    }
+    else{
+        ssd1306_WriteString("TESTING EN", Font_6x8, Black);
+    }
 	ssd1306_UpdateScreen();
 	HAL_Delay(1000);
 }
@@ -237,7 +263,12 @@ void ssd1306_DisplayENTestMsg() {
 void ssd1306_DisplayOCTestMsg() {
 	ssd1306_Fill(White);
     ssd1306_SetCursor(2,31);
-	ssd1306_WriteString("TESTING OC PROTECTION", Font_6x8, Black);
+    if (OC_TEST){
+        ssd1306_WriteString("TESTING OC: PASS", Font_6x8, Black);
+    }
+    else{
+        ssd1306_WriteString("TESTING OC PROTECTION", Font_6x8, Black);
+    }
 	ssd1306_UpdateScreen();
 	HAL_Delay(1000);
 }

@@ -265,7 +265,7 @@ void     INA228_Reset(INA228_t *ina228);
 // //
 // //                               typical value
 // uint16_t getManufacturer();  //  0x5449 ("TI" in ASCII)
-// uint16_t getDieID();         //  0x0228
+uint16_t INA228_getDieID();         //  0x0228
 // uint16_t getRevision();      //  0x0001
 
 // //
