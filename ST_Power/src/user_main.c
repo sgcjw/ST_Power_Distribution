@@ -149,7 +149,21 @@ void ssd1306_DisplayData() {
 
     ssd1306_SetCursor(2,50);
 	ssd1306_WriteString("OC SETTING:", Font_6x8, Black);
-	integer = oc;
+	if (750 <= oc && oc <= 850){
+        integer = 5;
+    }
+    else if (1450 <= oc && oc <= 1550){
+        integer = 10;
+    }
+    else if (1900 <= oc && oc <= 2000){
+        integer = 20;
+    }
+    else if (2200 <= oc && oc <= 2300){
+        integer = 30;
+    }
+    else {
+        integer = 0; // No OC Setting 
+    }
     snprintf(buff, sizeof(buff), "%d A", integer);
     ssd1306_WriteString(buff, Font_6x8, Black);
 
