@@ -18,6 +18,7 @@ uint8_t ina228_address = 0x40;
 float maxcurrent = 30.0;
 float shunt = 0.004f;
 uint8_t svct = 3; // 540us conversion time
+uint16_t ppm = 200; // 200 ppm temperature coefficent
 uint16_t id = 0;
 float current = 0;
 float fault_current = 0;
@@ -33,7 +34,7 @@ void user_setup()
     // ADD SETUP CODE HERE
     ssd1306_DisplayOnMsg();
     ssd1306_Init();
-    if (INA228_Init(&ina228, &hi2c1, ina228_address, maxcurrent, shunt, svct) == 1) {
+    if (INA228_Init(&ina228, &hi2c1, ina228_address, maxcurrent, shunt, svct, ppm) == 1) {
         ssd1306_DisplayReadyMsg();
     }
     Automated_Check();

@@ -74,7 +74,7 @@ HAL_StatusTypeDef Write16(INA228_t *ina228, uint8_t Register, uint16_t Value)
 	return HAL_I2C_Mem_Write(ina228->ina228_i2c, (ina228->Address<<1), Register, 1, (uint8_t*)addr, 2, 1000);
 }
 
-uint16_t INA228_Init(INA228_t *ina228, I2C_HandleTypeDef *i2c, uint8_t Address, float maxcurrent, float shunt, uint8_t svct)
+uint16_t INA228_Init(INA228_t *ina228, I2C_HandleTypeDef *i2c, uint8_t Address, float maxcurrent, float shunt, uint8_t svct, uint16_t ppm)
 {
 	ina228->ina228_i2c = i2c;
 	ina228->Address = Address;
@@ -86,7 +86,9 @@ uint16_t INA228_Init(INA228_t *ina228, I2C_HandleTypeDef *i2c, uint8_t Address, 
 		//Feel free to change this if you want. This function should be called in your main function to be polled.
 		INA228_Reset(ina228);
 		INA228_setCalibration(ina228, maxcurrent, shunt); // default calibration 30A, 4mOhm shunt
-		INA228_setShuntVoltageConversionTime(ina228, svct); // set shunt voltage conversion time to 532us
+		INA228_setShuntVoltageConversionTime(ina228, svct); // set shunt voltage conversion time to svct
+		INA228_setTemperatureCompensation(ina228, 1); // enable temperature compensation
+		INA228_setShuntTemperatureCoefficent(ina228, ppm); // set shunt temperature coefficient to ppm
 		return 1;
 	}
 	else
@@ -211,4 +213,17 @@ void INA228_setShuntVoltageConversionTime(INA228_t *ina228, uint8_t svct)
   value &= ~INA228_ADC_VSHCT;
   value |= (svct << 6);
   Write16(ina228, INA228_ADC_CONFIG, value);
+}
+
+void INA228_setTemperatureCompensation(INA228_t *ina228, bool on)
+{
+  uint16_t value = Read16(ina228, INA228_CONFIG);
+  if (on) value |= INA228_CFG_TEMPCOMP;
+  else    value &= ~INA228_CFG_TEMPCOMP;
+  Write16(ina228, INA228_CONFIG, value);
+}
+
+void INA228_setShuntTemperatureCoefficent(INA228_t *ina228, uint16_t ppm)
+{
+  Write16(ina228, INA228_SHUNT_TEMP_CO, ppm);
 }

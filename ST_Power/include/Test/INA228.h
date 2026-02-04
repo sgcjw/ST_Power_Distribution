@@ -135,7 +135,7 @@ uint16_t ina228_calibrationValue;
 int16_t ina228_currentDivider_mA;
 int16_t ina228_powerMultiplier_mW;
 
-uint16_t INA228_Init(INA228_t *ina228, I2C_HandleTypeDef *i2c, uint8_t Address, float maxcurrent, float shunt, uint8_t svct);
+uint16_t INA228_Init(INA228_t *ina228, I2C_HandleTypeDef *i2c, uint8_t Address, float maxcurrent, float shunt, uint8_t svct, uint16_t ppm);
 
 //
 //  CORE FUNCTIONS + scale wrappers.
@@ -274,6 +274,8 @@ uint16_t INA228_getDieID();         //  0x0228
 
 void INA228_setCalibration(INA228_t *ina228, float maxCurrent, float shunt);
 void INA228_setShuntVoltageConversionTime(INA228_t *ina228, uint8_t svct);
+void INA228_setTemperatureCompensation(INA228_t *ina228, bool on);
+void INA228_setShuntTemperatureCoefficent(INA228_t *ina228, uint16_t ppm);
 uint16_t Read16(INA228_t *ina228, uint8_t Register);
 HAL_StatusTypeDef Write16(INA228_t *ina228, uint8_t Register, uint16_t Value);
 
