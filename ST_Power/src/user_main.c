@@ -8,7 +8,7 @@ uint32_t screen_timer = 0;
 uint32_t hb_timer = 0;
 uint32_t monitor_timer = 0;
 
-bool PG = false;
+bool PG = true;
 bool FAULT = false;
 bool EN_TEST = false;
 bool OC_TEST = false;
@@ -22,7 +22,7 @@ float current = 0;
 float voltage = 0;
 // float shunt_voltage = 0;
 uint16_t temp = 0;
-uint16_t oc = 0;
+int oc = 0;
 
 
 void user_setup()
@@ -33,8 +33,11 @@ void user_setup()
     if (INA228_Init(&ina228, &hi2c1, ina228_address, maxcurrent, shunt) == 1) {
         ssd1306_DisplayReadyMsg();
     }
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET); // Remove the OC fault condition
     Automated_Check();
+    __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_7);
+    __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_0);
+    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+    HAL_NVIC_EnableIRQ(EXTI0_IRQn);
 }
 
 void user_loop()
@@ -87,13 +90,30 @@ void Automated_Check() {
         ssd1306_DisplayOCTestMsg();
     }
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET); // Reset OC Test
+    HAL_Delay(500); // Wait for system to stabilize
 }
 
 // Overcurrent setting check function
-uint16_t OC_check() {
-    uint16_t oc_setting = 0;
+int OC_check() {
+    uint16_t reading = 0;
+    int oc_setting = 0;
     HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
-    oc_setting = HAL_ADC_GetValue(&hadc1);
+    reading = HAL_ADC_GetValue(&hadc1);
+    if (750 <= reading && reading <= 850){
+        oc_setting = 5;
+    }
+    else if (1450 <= reading && reading <= 1550){
+        oc_setting = 10;
+    }
+    else if (1900 <= reading && reading <= 2000){
+        oc_setting = 20;
+    }
+    else if (2200 <= reading && reading <= 2300){
+        oc_setting = 30;
+    }
+    else {
+        oc_setting = 0; // No OC Setting 
+    }
     return oc_setting; // Return in Amperes
 }
 
@@ -108,110 +128,96 @@ void ssd1306_DisplayData() {
 	char buff[64];
 	uint16_t integer, fraction;
 	ssd1306_Fill(White);
-
-	// ssd1306_SetCursor(2,5);
-	// ssd1306_WriteString("PG:  ", Font_6x8, Black);
-    // integer = PG ? 1 : 0;
-    // snprintf(buff, sizeof(buff), "%d", integer);
-    // ssd1306_WriteString(buff, Font_6x8, Black);
-
-
-    // ssd1306_SetCursor(70,5);
-	// ssd1306_WriteString("Fault:  ", Font_6x8, Black);
-    // integer = FAULT ? 1 : 0;
-    // snprintf(buff, sizeof(buff), "%d", integer);
-    // ssd1306_WriteString(buff, Font_6x8, Black);
-
-    ssd1306_SetCursor(2,5);
-	ssd1306_WriteString("Board ID:  ", Font_6x8, Black);
-    integer = id;
-    snprintf(buff, sizeof(buff), "%d", integer);
-    ssd1306_WriteString(buff, Font_6x8, Black);
-
-    ssd1306_SetCursor(2,20);
-	ssd1306_WriteString("Voltage:", Font_6x8, Black);
-	integer = (int) voltage/1000;
-	fraction = (int)(voltage - integer*1000);
-    snprintf(buff, sizeof(buff), "%d.%03d V", integer, fraction);
-    ssd1306_WriteString(buff, Font_6x8, Black);
-
-    // ssd1306_SetCursor(2,20);
-	// ssd1306_WriteString("Shunt:", Font_6x8, Black);
-	// integer = (int) shunt_voltage/1000;
-    // fraction = (int)(shunt_voltage - integer*1000);
-    // snprintf(buff, sizeof(buff), "%d.%02d V", integer, fraction);
-    // ssd1306_WriteString(buff, Font_6x8, Black);
-
-    ssd1306_SetCursor(2,30);
-	ssd1306_WriteString("Current:", Font_6x8, Black);
-	integer = (int) current/1000;
-	fraction = (int)(current - integer*1000);
-    snprintf(buff, sizeof(buff), "%d.%03d A", integer, fraction);
-    ssd1306_WriteString(buff, Font_6x8, Black);
-
-    ssd1306_SetCursor(2,40);
-	ssd1306_WriteString("Temperature:", Font_6x8, Black);
-	integer = (int) temp/1000;
-	fraction = (int)((temp - integer*1000));
-    snprintf(buff, sizeof(buff), "%d.%03d C", integer, fraction);
-    ssd1306_WriteString(buff, Font_6x8, Black);
-
-    ssd1306_SetCursor(2,50);
-	ssd1306_WriteString("OC SETTING:", Font_6x8, Black);
-	if (750 <= oc && oc <= 850){
-        integer = 5;
+    if (PG == GPIO_PIN_RESET) {
+        if (FAULT == GPIO_PIN_SET){
+            if (current > oc){
+                ssd1306_Fill(White);
+                ssd1306_SetCursor(2,31);
+                ssd1306_WriteString("Overcurrent", Font_6x8, Black);
+                ssd1306_UpdateScreen();
+            }
+            else if(voltage > 30){
+                ssd1306_Fill(White);
+                ssd1306_SetCursor(2,31);
+                ssd1306_WriteString("Overvoltage", Font_6x8, Black);
+                ssd1306_UpdateScreen();
+            }
+            else if(voltage < 10){
+                ssd1306_Fill(White);
+                ssd1306_SetCursor(2,31);
+                ssd1306_WriteString("Undervoltage", Font_6x8, Black);
+                ssd1306_UpdateScreen();
+            }
+            else{
+                ssd1306_Fill(White);
+                ssd1306_SetCursor(2,31);
+                ssd1306_WriteString("Unknown Fault", Font_6x8, Black);
+                ssd1306_UpdateScreen();
+            }
+        }
+        else{
+                ssd1306_Fill(White);
+                ssd1306_SetCursor(2,31);
+                ssd1306_WriteString("Board Failure", Font_6x8, Black);
+                ssd1306_UpdateScreen();
+        }
     }
-    else if (1450 <= oc && oc <= 1550){
-        integer = 10;
-    }
-    else if (1900 <= oc && oc <= 2000){
-        integer = 20;
-    }
-    else if (2200 <= oc && oc <= 2300){
-        integer = 30;
-    }
-    else {
-        integer = 0; // No OC Setting 
-    }
-    snprintf(buff, sizeof(buff), "%d A", integer);
-    ssd1306_WriteString(buff, Font_6x8, Black);
+    else{
+        // ssd1306_SetCursor(2,5);
+	    // ssd1306_WriteString("PG:  ", Font_6x8, Black);
+        // integer = PG ? 1 : 0;
+        // snprintf(buff, sizeof(buff), "%d", integer);
+        // ssd1306_WriteString(buff, Font_6x8, Black);
 
-    // ssd1306_SetCursor(2,21);
-    // if (BMS->connection != CONNECTED){
-    //     ssd1306_WriteString("BMS Not Connected", Font_7x10, Black);
-    // }
-    // else {
-    //     ssd1306_WriteString("Current: ", Font_6x8, Black);
 
-    //     uint16_t current = BMS->data.current;
-        
-    //     integer = current / 1000;
-    //     fraction = (current % 1000) / 10;  // two decimal places
-        
-    //     snprintf(buff, sizeof(buff), "%d.%02d A", integer, fraction);
-    //     ssd1306_WriteString(buff, Font_6x8, Black);
-    
-    //     ssd1306_SetCursor(2,31);
-    //     ssd1306_WriteString("Voltage: ", Font_6x8, Black);
-    //     integer = (int)(BMS->data.voltage/1000);
-    //     fraction = (int)((BMS->data.voltage/1000.0 - integer)*100);
-    //     snprintf(buff, sizeof(buff), "%d.%02d V", integer, fraction);
-    //     ssd1306_WriteString(buff, Font_6x8, Black);
-    
-    //     ssd1306_SetCursor(2,41);
-    //     ssd1306_WriteString("Batt %:  ", Font_6x8, Black);
-    //     snprintf(buff, sizeof(buff), "%d", (int)BMS->data.percentage);
-    //     ssd1306_WriteString(buff, Font_6x8, Black);
-    
-    //     ssd1306_SetCursor(2,51);
-    //     ssd1306_WriteString("State:   ", Font_6x8, Black);
-    //     setState(BMS->BQ_batteryStatus.all);
-    //     snprintf(buff, sizeof(buff), "%s", state);
-    //     ssd1306_WriteString(buff, Font_6x8, Black);
-    
-    // }
+        // ssd1306_SetCursor(70,5);
+	    // ssd1306_WriteString("Fault:  ", Font_6x8, Black);
+        // integer = FAULT ? 1 : 0;
+        // snprintf(buff, sizeof(buff), "%d", integer);
+        // ssd1306_WriteString(buff, Font_6x8, Black);
 
-    ssd1306_UpdateScreen();
+        ssd1306_SetCursor(2,5);
+	    ssd1306_WriteString("Board ID:  ", Font_6x8, Black);
+        integer = id;
+        snprintf(buff, sizeof(buff), "%d", integer);
+        ssd1306_WriteString(buff, Font_6x8, Black);
+
+        ssd1306_SetCursor(2,20);
+	    ssd1306_WriteString("Voltage:", Font_6x8, Black);
+	    integer = (int) voltage/1000;
+	    fraction = (int)(voltage - integer*1000);
+        snprintf(buff, sizeof(buff), "%d.%03d V", integer, fraction);
+        ssd1306_WriteString(buff, Font_6x8, Black);
+
+        // ssd1306_SetCursor(2,20);
+	    // ssd1306_WriteString("Shunt:", Font_6x8, Black);
+	    // integer = (int) shunt_voltage/1000;
+        // fraction = (int)(shunt_voltage - integer*1000);
+        // snprintf(buff, sizeof(buff), "%d.%02d V", integer, fraction);
+        // ssd1306_WriteString(buff, Font_6x8, Black);
+
+        ssd1306_SetCursor(2,30);
+	    ssd1306_WriteString("Current:", Font_6x8, Black);
+	    integer = (int) current/1000;
+	    fraction = (int)(current - integer*1000);
+        snprintf(buff, sizeof(buff), "%d.%03d A", integer, fraction);
+        ssd1306_WriteString(buff, Font_6x8, Black);
+
+        ssd1306_SetCursor(2,40);
+	    ssd1306_WriteString("Temperature:", Font_6x8, Black);
+	    integer = (int) temp/1000;
+	    fraction = (int)((temp - integer*1000));
+        snprintf(buff, sizeof(buff), "%d.%03d C", integer, fraction);
+        ssd1306_WriteString(buff, Font_6x8, Black);
+
+        ssd1306_SetCursor(2,50);
+	    ssd1306_WriteString("OC SETTING:", Font_6x8, Black);
+        integer = oc;
+        snprintf(buff, sizeof(buff), "%d A", integer);
+        ssd1306_WriteString(buff, Font_6x8, Black);
+
+        ssd1306_UpdateScreen();
+    }
 }
 
 /**
@@ -257,7 +263,7 @@ void ssd1306_DisplayReadyMsg() {
 void ssd1306_DisplayErrorMsg() {
 	ssd1306_Fill(White);
     ssd1306_SetCursor(2,31);
-	ssd1306_WriteString("ERROR: System Failure", Font_6x8, Black);
+	ssd1306_WriteString("ERROR: Init Failure", Font_6x8, Black);
 	ssd1306_UpdateScreen();
 	HAL_Delay(1000);
 }
@@ -294,6 +300,22 @@ void ssd1306_DisplayOCTestMsg() {
     }
 	ssd1306_UpdateScreen();
 	HAL_Delay(1000);
+}
+
+void EXTI9_5_IRQHandler(void)
+{
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_7);
+}
+
+void EXTI0_IRQHandler(void)
+{
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_0);
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    PG = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7);
+    FAULT = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0);
 }
 
 void user_error_handler()

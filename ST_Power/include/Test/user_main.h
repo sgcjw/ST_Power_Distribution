@@ -26,7 +26,7 @@ void user_error_handler();
 
 // ADD OTHER HELPER FUNCTIONS HERE
 void Automated_Check();
-uint16_t OC_check();
+int OC_check();
 void ssd1306_DisplayData();
 void ssd1306_DisplayOnMsg();
 void ssd1306_DisplayReadyMsg();
