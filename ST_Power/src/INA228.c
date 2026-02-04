@@ -74,7 +74,7 @@ HAL_StatusTypeDef Write16(INA228_t *ina228, uint8_t Register, uint16_t Value)
 	return HAL_I2C_Mem_Write(ina228->ina228_i2c, (ina228->Address<<1), Register, 1, (uint8_t*)addr, 2, 1000);
 }
 
-uint16_t INA228_Init(INA228_t *ina228, I2C_HandleTypeDef *i2c, uint8_t Address, float maxcurrent, float shunt)
+uint16_t INA228_Init(INA228_t *ina228, I2C_HandleTypeDef *i2c, uint8_t Address, float maxcurrent, float shunt, uint8_t svct)
 {
 	ina228->ina228_i2c = i2c;
 	ina228->Address = Address;
@@ -86,6 +86,7 @@ uint16_t INA228_Init(INA228_t *ina228, I2C_HandleTypeDef *i2c, uint8_t Address, 
 		//Feel free to change this if you want. This function should be called in your main function to be polled.
 		INA228_Reset(ina228);
 		INA228_setCalibration(ina228, maxcurrent, shunt); // default calibration 30A, 4mOhm shunt
+		INA228_setShuntVoltageConversionTime(ina228, svct); // set shunt voltage conversion time to 532us
 		return 1;
 	}
 	else
@@ -202,4 +203,12 @@ void INA228_setCalibration(INA228_t *ina228, float maxCurrent, float shunt)
     float shunt_cal = 13107.2e6 * current_LSB * shunt;
     //  shunt_cal must be written to its REGISTER.
     Write16(ina228, INA228_SHUNT_CAL, (uint16_t)shunt_cal);
+}
+
+void INA228_setShuntVoltageConversionTime(INA228_t *ina228, uint8_t svct)
+{
+  uint16_t value = Read16(ina228, INA228_ADC_CONFIG);
+  value &= ~INA228_ADC_VSHCT;
+  value |= (svct << 6);
+  Write16(ina228, INA228_ADC_CONFIG, value);
 }
