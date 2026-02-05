@@ -38,6 +38,7 @@ void ssd1306_DisplayOCTestMsg();
 #define SCREEN_TIMER 1000  // Screen update interval in milliseconds
 #define HB_TIMER 1000  // Heartbeat interval in milliseconds
 #define MONITOR_TIMER 0 // Monitor interval in milliseconds
+#define USB_TIMER 1000 // Sending USB message in milliseconds
 
 #ifdef __cplusplus
 }

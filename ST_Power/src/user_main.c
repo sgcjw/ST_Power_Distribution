@@ -1,5 +1,7 @@
 #include "user_main.h"
 #include "main.h"
+#include "usb_device.h"
+#include "usbd_cdc_if.h"
 
 extern ADC_HandleTypeDef hadc1;
 
@@ -7,6 +9,7 @@ extern ADC_HandleTypeDef hadc1;
 uint32_t screen_timer = 0;
 uint32_t hb_timer = 0;
 uint32_t monitor_timer = 0;
+uint32_t usb_timer = 0;
 
 bool PG = true;
 bool FAULT = false;
@@ -31,6 +34,7 @@ int oc = 0;
 
 void user_setup()
 {
+    MX_USB_DEVICE_Init();    // MUST be called after MX_USB_PCD_Init()
     // ADD SETUP CODE HERE
     ssd1306_DisplayOnMsg();
     ssd1306_Init();
@@ -65,6 +69,29 @@ void user_loop()
         oc = OC_check();
         screen_timer = HAL_GetTick();
         ssd1306_DisplayData();
+    }
+    if (HAL_GetTick() - usb_timer > USB_TIMER) {
+        usb_timer = HAL_GetTick();
+        char string[128];
+
+        int v_i = (int)(voltage/1000);
+        int v_f = (int)(voltage - v_i * 1000);
+
+        int c_i = (int)(current/1000);
+        int c_f = (int)(current - c_i * 1000);
+
+        int t_i = (int)(temp/1000);
+        int t_f = (int)(temp - t_i * 1000);
+
+        snprintf(string, sizeof(string),
+            "Voltage: %d.%03d V\r\n"
+            "Current: %d.%03d A\r\n"
+            "Temp:    %d.%03d C\r\n",
+            v_i, v_f,
+            c_i, c_f,
+            t_i, t_f);
+
+        CDC_Transmit_FS((uint8_t*)string, strlen(string));
     }
 }
 
