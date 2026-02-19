@@ -135,7 +135,7 @@ uint16_t ina228_calibrationValue;
 int16_t ina228_currentDivider_mA;
 int16_t ina228_powerMultiplier_mW;
 
-uint16_t INA228_Init(INA228_t *ina228, I2C_HandleTypeDef *i2c, uint8_t Address, float maxcurrent, float shunt, uint8_t svct, uint16_t ppm);
+uint16_t INA228_Init(INA228_t *ina228, I2C_HandleTypeDef *i2c, uint8_t Address, float maxcurrent, float shunt, uint8_t bvct, uint8_t svct, uint8_t tct, uint16_t ppm);
 
 //
 //  CORE FUNCTIONS + scale wrappers.
@@ -190,23 +190,9 @@ void     INA228_Reset(INA228_t *ina228);
 // //
 // //  CONFIG ADC REGISTER 1
 // //  read datasheet for details, section 7.6.1.2, page 22++
-// //
-// // bool     setMode(uint8_t mode = INA228_MODE_CONT_TEMP_BUS_SHUNT);
-// bool     setMode(uint8_t mode);
-// uint8_t  getMode();
-// //  default value = ~1 milliseconds for all.
-// //bool     setBusVoltageConversionTime(uint8_t bvct = INA228_1052_us);
-// bool     setBusVoltageConversionTime(uint8_t bvct);
-// uint8_t  getBusVoltageConversionTime();
-// //bool     setShuntVoltageConversionTime(uint8_t svct = INA228_1052_us);
-// bool     setShuntVoltageConversionTime(uint8_t svct);
-// uint8_t  getShuntVoltageConversionTime();
-// //bool     setTemperatureConversionTime(uint8_t tct = INA228_1052_us);
-// bool     setTemperatureConversionTime(uint8_t tct);
-// uint8_t  getTemperatureConversionTime();
-// //bool     setAverage(uint8_t avg = INA228_1_SAMPLE);
-// bool     setAverage(uint8_t avg);
-// uint8_t  getAverage();
+void INA228_setBusVoltageConversionTime(INA228_t *ina228, uint8_t bvct);
+void INA228_setShuntVoltageConversionTime(INA228_t *ina228, uint8_t svct);
+void INA228_setTemperatureConversionTime(INA228_t *ina228, uint8_t tct);
 
 // //
 // //  SHUNT CALIBRATION REGISTER 2
@@ -230,33 +216,17 @@ void     INA228_Reset(INA228_t *ina228);
 
 // //
 // //  DIAGNOSE ALERT REGISTER 11  (0x0B)
-// //  read datasheet for details, section 7.6.1.12, page 26++.
-// //
-// void     setDiagnoseAlert(uint16_t flags);
-// uint16_t getDiagnoseAlert();
-// //  INA228.h has an enum for the bit fields.
-// //  See ina228_diag_enum above
-// void     setDiagnoseAlertBit(uint8_t bit);
-// void     clearDiagnoseAlertBit(uint8_t bit);
-// uint16_t getDiagnoseAlertBit(uint8_t bit);
-
+void INA228_setDiagnoseAlertBit(INA228_t *ina228, uint8_t bit);
+uint16_t INA228_getDiagnoseAlert(INA228_t *ina228);
+void INA228_setLatch(INA228_t *ina228, bool latch);
+int INA228_checkFault(INA228_t *ina228);
 
 // //
 // //  THRESHOLD AND LIMIT REGISTERS 12-17
-// //  read datasheet for details, section 7.3.7, page 16++
-// //
-// void     setShuntOvervoltageTH(uint16_t threshold);
-// uint16_t getShuntOvervoltageTH();
-// void     setShuntUndervoltageTH(uint16_t threshold);
-// uint16_t getShuntUndervoltageTH();
-// void     setBusOvervoltageTH(uint16_t threshold);
-// uint16_t getBusOvervoltageTH();
-// void     setBusUndervoltageTH(uint16_t threshold);
-// uint16_t getBusUndervoltageTH();
-// void     setTemperatureOverLimitTH(uint16_t threshold);
-// uint16_t getTemperatureOverLimitTH();
-// void     setPowerOverLimitTH(uint16_t threshold);
-// uint16_t getPowerOverLimitTH();
+void INA228_setShuntOvervoltageTH(INA228_t *ina228, uint16_t threshold, float shunt);
+void INA228_setBusOvervoltageTH(INA228_t *ina228, uint16_t threshold);
+void INA228_setBusUndervoltageTH(INA228_t *ina228, uint16_t threshold);
+void INA228_setTemperatureOverLimitTH(INA228_t *ina228, uint16_t threshold);
 
 
 // //
@@ -273,7 +243,6 @@ uint16_t INA228_getDieID();         //  0x0228
 // int      getLastError();
 
 void INA228_setCalibration(INA228_t *ina228, float maxCurrent, float shunt);
-void INA228_setShuntVoltageConversionTime(INA228_t *ina228, uint8_t svct);
 void INA228_setTemperatureCompensation(INA228_t *ina228, bool on);
 void INA228_setShuntTemperatureCoefficent(INA228_t *ina228, uint16_t ppm);
 uint16_t Read16(INA228_t *ina228, uint8_t Register);

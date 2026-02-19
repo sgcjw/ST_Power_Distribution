@@ -19,8 +19,10 @@ bool OC_TEST = false;
 INA228_t *ina228;
 uint8_t ina228_address = 0x40;
 float maxcurrent = 30.0;
-float shunt = 0.004f;
-uint8_t svct = 3; // 540us conversion time
+float shunt = 0.001f;
+uint8_t bvct = 1; // 84us bus voltage conversion time
+uint8_t svct = 2; // 150us shunt voltage conversion time
+uint8_t tct = 1;  // 84us temperature conversion time
 uint16_t ppm = 200; // 200 ppm temperature coefficent
 uint16_t id = 0;
 float current = 0;
@@ -28,7 +30,7 @@ float fault_current = 0;
 float voltage = 0;
 float fault_voltage = 0;
 // float shunt_voltage = 0;
-uint16_t temp = 0;
+float temp = 0;
 int oc = 0;
 
 
@@ -38,7 +40,7 @@ void user_setup()
     // ADD SETUP CODE HERE
     ssd1306_DisplayOnMsg();
     ssd1306_Init();
-    if (INA228_Init(&ina228, &hi2c1, ina228_address, maxcurrent, shunt, svct, ppm) == 1) {
+    if (INA228_Init(&ina228, &hi2c1, ina228_address, maxcurrent, shunt, bvct, svct, tct, ppm) == 1) {
         ssd1306_DisplayReadyMsg();
     }
     Automated_Check();
@@ -86,6 +88,8 @@ void user_loop()
         snprintf(string, sizeof(string),
             "Voltage: %d.%03d V\r\n"
             "Current: %d.%03d A\r\n"
+            // for Temp Recording
+            // "%d.%03d \r\n", 
             "Temp:    %d.%03d C\r\n",
             v_i, v_f,
             c_i, c_f,
@@ -161,7 +165,7 @@ void ssd1306_DisplayData() {
 	ssd1306_Fill(White);
     if (PG == GPIO_PIN_RESET) {
         if (FAULT == GPIO_PIN_SET){
-            if (fault_current/1000 > oc - 1){
+            if (fault_current > (oc - 1)*1000){
                 ssd1306_Fill(White);
                 ssd1306_SetCursor(2,31);
                 ssd1306_WriteString("Overcurrent: ", Font_6x8, Black);
@@ -171,7 +175,7 @@ void ssd1306_DisplayData() {
                 ssd1306_WriteString(buff, Font_6x8, Black);
                 ssd1306_UpdateScreen();
             }
-            else if(fault_voltage/1000 > 28){
+            else if(fault_voltage > 28000){
                 ssd1306_Fill(White);
                 ssd1306_SetCursor(2,31);
                 ssd1306_WriteString("Overvoltage: ", Font_6x8, Black);
@@ -181,7 +185,7 @@ void ssd1306_DisplayData() {
                 ssd1306_WriteString(buff, Font_6x8, Black);
                 ssd1306_UpdateScreen();
             }
-            else if(fault_voltage/1000 < 11){
+            else if(fault_voltage < 11000){
                 ssd1306_Fill(White);
                 ssd1306_SetCursor(2,31);
                 ssd1306_WriteString("Undervoltage: ", Font_6x8, Black);
@@ -367,10 +371,12 @@ void EXTI0_IRQHandler(void)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
+    fault_current = INA228_ReadCurrent(&ina228, maxcurrent);
+    // //to bypass undervoltage when no voltage readings
+    // fault_voltage = 20000;
+    fault_voltage = voltage;
     PG = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7);
     FAULT = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0);
-    fault_current = current;
-    fault_voltage = voltage;
 }
 
 void user_error_handler()
