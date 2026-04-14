@@ -218,15 +218,16 @@ void INA228_setTemperatureConversionTime(INA228_t *ina228, uint8_t tct);
 // //  DIAGNOSE ALERT REGISTER 11  (0x0B)
 void INA228_setDiagnoseAlertBit(INA228_t *ina228, uint8_t bit);
 uint16_t INA228_getDiagnoseAlert(INA228_t *ina228);
+void INA228_clearDiagnoseAlert(INA228_t *ina228);
 void INA228_setLatch(INA228_t *ina228, bool latch);
-int INA228_checkFault(INA228_t *ina228);
+uint16_t INA228_checkFault(INA228_t *ina228);
 
 // //
 // //  THRESHOLD AND LIMIT REGISTERS 12-17
-void INA228_setShuntOvervoltageTH(INA228_t *ina228, uint16_t threshold, float shunt);
-void INA228_setBusOvervoltageTH(INA228_t *ina228, uint16_t threshold);
-void INA228_setBusUndervoltageTH(INA228_t *ina228, uint16_t threshold);
-void INA228_setTemperatureOverLimitTH(INA228_t *ina228, uint16_t threshold);
+void INA228_setShuntOvervoltageTH(INA228_t *ina228, float threshold, float shunt);
+void INA228_setBusOvervoltageTH(INA228_t *ina228, float threshold);
+void INA228_setBusUndervoltageTH(INA228_t *ina228, float threshold);
+void INA228_setTemperatureOverLimitTH(INA228_t *ina228, float threshold);
 
 
 // //

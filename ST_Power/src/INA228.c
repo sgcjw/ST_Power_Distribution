@@ -91,10 +91,11 @@ uint16_t INA228_Init(INA228_t *ina228, I2C_HandleTypeDef *i2c, uint8_t Address, 
 		INA228_setTemperatureConversionTime(ina228, tct); // set temperature conversion time to tct
 		INA228_setTemperatureCompensation(ina228, 1); // enable temperature compensation
 		INA228_setShuntTemperatureCoefficent(ina228, ppm); // set shunt temperature coefficient to ppm
-		INA228_setLatch(ina228, true); // set alert latch to true (latch until cleared)
-		INA228_setBusOvervoltageTH(ina228, 30); // set bus overvoltage threshold to 30V
+		INA228_setLatch(ina228, true); // set alert latch to false (latch until cleared)
+		INA228_setBusOvervoltageTH(ina228, 28); // set bus overvoltage detection threshold to 28V
 		INA228_setBusUndervoltageTH(ina228, 10); // set bus undervoltage threshold to 10V
-		INA228_setShuntOvervoltageTH(ina228, 20, shunt); // set overcurrent threshold to 20A
+		INA228_setShuntOvervoltageTH(ina228, 4, shunt); // set overcurrent threshold to 5A
+		INA228_setTemperatureOverLimitTH(ina228, 80); // set temperature over limit threshold to 80 degrees Celsius
 		return 1;
 	}
 	else
@@ -256,6 +257,11 @@ void INA228_setShuntTemperatureCoefficent(INA228_t *ina228, uint16_t ppm)
 //
 ////////////////////////////////////////////////////////
 
+void INA228_setDiagnoseAlert(INA228_t *ina228, uint16_t flags)
+{
+  Write16(ina228, INA228_DIAG_ALERT, flags);
+}
+
 //  INA228.h has an enum for the bit fields.
 void INA228_setDiagnoseAlertBit(INA228_t *ina228, uint8_t bit)
 {
@@ -278,28 +284,27 @@ uint16_t INA228_getDiagnoseAlert(INA228_t *ina228)
 void INA228_setLatch(INA228_t *ina228, bool latch)
 {
 	if (latch){
-		INA228_setDiagnoseAlertBit(ina228, INA228_DIAG_MEMORY_STATUS); // set alert latch bit to 1 to latch alerts
+		INA228_setDiagnoseAlertBit(ina228, INA228_DIAG_ALERT_LATCH); // set alert latch bit to 1 to latch alerts
 	}
 }
 
-int INA228_checkFault(INA228_t *ina228)
+uint16_t INA228_checkFault(INA228_t *ina228)
 {
 	uint16_t fault = INA228_getDiagnoseAlert(ina228);
+	uint16_t number = 0;
 	if (fault & (1 << INA228_DIAG_SHUNT_OVER_LIMIT)){
-		return 1;
+		number = 1;
 	}
-	else if (fault & (1 << INA228_DIAG_BUS_OVER_LIMIT)){
-		return 2;
+	if (fault & (1 << INA228_DIAG_BUS_OVER_LIMIT)){
+		number = 2;
 	}
-	else if (fault & (1 << INA228_DIAG_BUS_UNDER_LIMIT)){
-		return 3;
+	if (fault & (1 << INA228_DIAG_BUS_UNDER_LIMIT)){
+		number = 3;
 	}
-	else if (fault & (1 << INA228_DIAG_TEMP_OVER_LIMIT)){
-		return 4;
+	if (fault & (1 << INA228_DIAG_TEMP_OVER_LIMIT)){
+		number = 4;
 	}
-	else{
-		return 0;
-	}
+	return number;
 }
 
 ////////////////////////////////////////////////////////
@@ -308,7 +313,7 @@ int INA228_checkFault(INA228_t *ina228)
 //
 ////////////////////////////////////////////////////////
 
-void INA228_setShuntOvervoltageTH(INA228_t *ina228, uint16_t threshold, float shunt)
+void INA228_setShuntOvervoltageTH(INA228_t *ina228, float threshold, float shunt)
 {
   //  Conversion Factor: 5 μV/LSB when ADCRANGE = 0
   //  1.25 μV/LSB when ADCRANGE = 1.
@@ -317,14 +322,14 @@ void INA228_setShuntOvervoltageTH(INA228_t *ina228, uint16_t threshold, float sh
   Write16(ina228, INA228_SOVL, TH);
 }
 
-void INA228_setBusOvervoltageTH(INA228_t *ina228, uint16_t threshold)
+void INA228_setBusOvervoltageTH(INA228_t *ina228, float threshold)
 {
   float LSB = 3.125e-3;  //  3.125 mV/LSB.
   uint16_t TH = threshold / LSB;
   Write16(ina228, INA228_BOVL, TH);
 }
 
-void INA228_setBusUndervoltageTH(INA228_t *ina228, uint16_t threshold)
+void INA228_setBusUndervoltageTH(INA228_t *ina228, float threshold)
 {
   float LSB = 3.125e-3;  //  3.125 mV/LSB.
   uint16_t TH = threshold / LSB;
@@ -332,7 +337,7 @@ void INA228_setBusUndervoltageTH(INA228_t *ina228, uint16_t threshold)
 }
 
 
-void INA228_setTemperatureOverLimitTH(INA228_t *ina228, uint16_t threshold)
+void INA228_setTemperatureOverLimitTH(INA228_t *ina228, float threshold)
 {
   float LSB = 7.8125e-3;  //  milli degrees Celsius
   uint16_t TH = threshold / LSB;

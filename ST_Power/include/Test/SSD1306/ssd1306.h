@@ -8,8 +8,8 @@
 #ifndef __SSD1306_H__
 #define __SSD1306_H__
 
-#include <stddef.h>
 #include <_ansi.h>
+#include <stddef.h>
 
 _BEGIN_STD_C
 
@@ -35,19 +35,20 @@ _BEGIN_STD_C
 #elif defined(STM32F7)
 #include "stm32f7xx_hal.h"
 #else
-#error "SSD1306 library was tested only on  STM32F0, STM32F1, STM32F3, STM32F4, STM32F7, STM32L0, STM32L4, STM32H7 MCU families. Please modify ssd1306.h if you know what you are doing. Also please send a pull request if it turns out the library works on other MCU's as well!"
-#endif
+#error "SSD1306 library was tested only on  STM32F0, STM32F1, STM32F3, STM32F4, STM32F7, STM32L0, STM32L4, STM32H7 MCU
+families. Please modify ssd1306.h if you know what you are doing. Also please send a pull request if it turns out the
+library works on other MCU's as well!" #endif
 */
 #include "ssd1306_fonts.h"
 
 /* vvv I2C config vvv */
 
 #ifndef SSD1306_I2C_PORT
-#define SSD1306_I2C_PORT        hi2c2
+#define SSD1306_I2C_PORT hi2c2
 #endif
 
 #ifndef SSD1306_I2C_ADDR
-#define SSD1306_I2C_ADDR        (0x3C << 1)
+#define SSD1306_I2C_ADDR (0x3C << 1)
 #endif
 
 /* ^^^ I2C config ^^^ */
@@ -55,28 +56,28 @@ _BEGIN_STD_C
 /* vvv SPI config vvv */
 
 #ifndef SSD1306_SPI_PORT
-#define SSD1306_SPI_PORT        hspi1
+#define SSD1306_SPI_PORT hspi1
 #endif
 
 #ifndef SSD1306_CS_Port
-#define SSD1306_CS_Port         GPIOA
+#define SSD1306_CS_Port GPIOA
 #endif
 #ifndef SSD1306_CS_Pin
-#define SSD1306_CS_Pin          GPIO_PIN_4
+#define SSD1306_CS_Pin GPIO_PIN_4
 #endif
 
 #ifndef SSD1306_DC_Port
-#define SSD1306_DC_Port         GPIOB
+#define SSD1306_DC_Port GPIOB
 #endif
 #ifndef SSD1306_DC_Pin
-#define SSD1306_DC_Pin          GPIO_PIN_0
+#define SSD1306_DC_Pin GPIO_PIN_0
 #endif
 
 #ifndef SSD1306_Reset_Port
-#define SSD1306_Reset_Port      GPIOB
+#define SSD1306_Reset_Port GPIOB
 #endif
 #ifndef SSD1306_Reset_Pin
-#define SSD1306_Reset_Pin       GPIO_PIN_12
+#define SSD1306_Reset_Pin GPIO_PIN_12
 #endif
 
 /* ^^^ SPI config ^^^ */
@@ -91,43 +92,48 @@ extern SPI_HandleTypeDef SSD1306_SPI_PORT;
 
 // SSD1306 OLED height in pixels
 #ifndef SSD1306_HEIGHT
-#define SSD1306_HEIGHT          64
+#define SSD1306_HEIGHT 64
 #endif
 
 // SSD1306 width in pixels
 #ifndef SSD1306_WIDTH
-#define SSD1306_WIDTH           128
+#define SSD1306_WIDTH 128
 #endif
 
 // some LEDs don't display anything in first two columns
 // #define SSD1306_WIDTH           130
 
 #ifndef SSD1306_BUFFER_SIZE
-#define SSD1306_BUFFER_SIZE   SSD1306_WIDTH * SSD1306_HEIGHT / 8
+#define SSD1306_BUFFER_SIZE SSD1306_WIDTH* SSD1306_HEIGHT / 8
 #endif
 
 // Enumeration for screen colors
-typedef enum {
-    Black = 0x00, // Black color, no pixel
-    White = 0x01  // Pixel is set. Color depends on OLED
+typedef enum
+{
+	Black = 0x00, // Black color, no pixel
+	White = 0x01  // Pixel is set. Color depends on OLED
 } SSD1306_COLOR;
 
-typedef enum {
-    SSD1306_OK = 0x00,
-    SSD1306_ERR = 0x01  // Generic error.
+typedef enum
+{
+	SSD1306_OK = 0x00,
+	SSD1306_ERR = 0x01 // Generic error.
 } SSD1306_Error_t;
 
 // Struct to store transformations
-typedef struct {
-    uint16_t CurrentX;
-    uint16_t CurrentY;
-    uint8_t Inverted;
-    uint8_t Initialized;
-    uint8_t DisplayOn;
+typedef struct
+{
+	uint16_t CurrentX;
+	uint16_t CurrentY;
+	uint8_t Inverted;
+	uint8_t Initialized;
+	uint8_t DisplayOn;
 } SSD1306_t;
-typedef struct {
-    uint8_t x;
-    uint8_t y;
+
+typedef struct
+{
+	uint8_t x;
+	uint8_t y;
 } SSD1306_VERTEX;
 
 // Procedure definitions
@@ -141,7 +147,7 @@ void ssd1306_SetCursor(uint8_t x, uint8_t y);
 void ssd1306_Line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, SSD1306_COLOR color);
 void ssd1306_DrawArc(uint8_t x, uint8_t y, uint8_t radius, uint16_t start_angle, uint16_t sweep, SSD1306_COLOR color);
 void ssd1306_DrawCircle(uint8_t par_x, uint8_t par_y, uint8_t par_r, SSD1306_COLOR color);
-void ssd1306_Polyline(const SSD1306_VERTEX *par_vertex, uint16_t par_size, SSD1306_COLOR color);
+void ssd1306_Polyline(const SSD1306_VERTEX* par_vertex, uint16_t par_size, SSD1306_COLOR color);
 void ssd1306_DrawRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, SSD1306_COLOR color);
 /**
  * @brief Sets the contrast of the display.
