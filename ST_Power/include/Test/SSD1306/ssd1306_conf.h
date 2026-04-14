@@ -30,9 +30,9 @@
 //#define SSD1306_USE_SPI
 
 // I2C Configuration
-extern I2C_HandleTypeDef hi2c2;
-#define SSD1306_I2C_PORT        hi2c2
-#define SSD1306_I2C_ADDR        (0x78)
+extern I2C_HandleTypeDef hi2c1;
+#define SSD1306_I2C_PORT        hi2c1
+#define SSD1306_I2C_ADDR        (0x3C) // 0x3D for 128x64, 0x3C for 128x32
 
 // Mirror the screen if needed
 // #define SSD1306_MIRROR_VERT

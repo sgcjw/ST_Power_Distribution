@@ -4,6 +4,8 @@
 #include "usbd_cdc_if.h"
 
 extern ADC_HandleTypeDef hadc1;
+extern ADC_HandleTypeDef hadc2;
+extern ADC_HandleTypeDef hadc3;
 
 // ADD YOUR INCLUDES HERE
 uint32_t screen_timer = 0;
@@ -17,8 +19,9 @@ bool FAULT_CHECK = false;
 uint16_t FAULT_TYPE = 0; // 1 for overcurrent, 2 for overvoltage, 3 for undervoltage, 4 for overtemperature
 bool EN_TEST = false;
 bool OC_TEST = false;
+bool INA228_READY = false;
 
-INA228_t *ina228;
+INA228_t ina228;
 uint8_t ina228_address = 0x40;
 float maxcurrent = 30.0;
 float shunt = 0.004f;
@@ -38,18 +41,20 @@ int oc = 0;
 
 void user_setup()
 {
-    MX_USB_DEVICE_Init();    // MUST be called after MX_USB_PCD_Init()
     // ADD SETUP CODE HERE
-    ssd1306_Init();
-    ssd1306_DisplayOnMsg();
-    Automated_Check();
-    if (INA228_Init(&ina228, &hi2c1, ina228_address, maxcurrent, shunt, bvct, svct, tct, ppm) == 1) {
-        ssd1306_DisplayReadyMsg();
+    // ssd1306_DisplayOnMsg();
+    // ssd1306_Init();
+    // Automated_Check();
+    if (INA228_Init(&ina228, &hi2c2, ina228_address, maxcurrent, shunt, bvct, svct, tct, ppm) == 1) {
+        INA228_READY = true;
     }
-    __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_7);
-    __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_0);
-    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-    HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+    // HAL_ADC_Start(&hadc1);
+    // HAL_ADC_Start(&hadc2);
+    HAL_ADC_Start(&hadc3);
+    // __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_7);
+    // __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_0);
+    // HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+    // HAL_NVIC_EnableIRQ(EXTI0_IRQn);
 }
 
 void user_loop()
@@ -58,23 +63,23 @@ void user_loop()
     if (HAL_GetTick() - hb_timer > HB_TIMER) {
         hb_timer = HAL_GetTick();
         HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-        for(uint8_t i=0;i<128;i++)
     }
     if (HAL_GetTick() - monitor_timer > MONITOR_TIMER) {
         monitor_timer = HAL_GetTick();
-        // PG = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7);
-        // FAULT = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0);
+        PG = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_15);
+        FAULT = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_10);
         current = INA228_ReadCurrent(&ina228, maxcurrent);
         voltage = INA228_ReadBusVoltage(&ina228);
+        oc = OC_check();
         // shunt_voltage = INA228_ReadShuntVoltage(&ina228)/0.004f;
         temp = INA228_getTemperature(&ina228);
     }
-    if (HAL_GetTick() - screen_timer > SCREEN_TIMER) {
-        id = INA228_getDieID(&ina228);
-        oc = OC_check();
-        screen_timer = HAL_GetTick();
-        ssd1306_DisplayData();
-    }
+    // if (HAL_GetTick() - screen_timer > SCREEN_TIMER) {
+    //     id = INA228_getDieID(&ina228);
+    //     oc = OC_check();
+    //     screen_timer = HAL_GetTick();
+    //     ssd1306_DisplayData();
+    // }
     if (HAL_GetTick() - usb_timer > USB_TIMER) {
         usb_timer = HAL_GetTick();
         char string[128];
@@ -88,16 +93,28 @@ void user_loop()
         int t_i = (int)(temp/1000);
         int t_f = (int)(temp - t_i * 1000);
 
+        int oc_i = oc;
+
         snprintf(string, sizeof(string),
             "Voltage: %d.%03d V\r\n"
             "Current: %d.%03d A\r\n"
             // for Temp Recording
             // "%d.%03d \r\n", 
-            "Temp:    %d.%03d C\r\n",
+            "Temp:    %d.%03d C\r\n"
+            "OC Setting: %d A\r\n",
             v_i, v_f,
             c_i, c_f,
-            t_i, t_f);
-
+            t_i, t_f,
+            oc_i);
+        if (PG == true){
+            char msg[] = "POWER GOOD\r\n";
+            CDC_Transmit_FS((uint8_t*)msg, strlen(msg));
+        }
+        if (FAULT == true)
+        {
+            char msg[] = "FAULT DETECTED\r\n";
+            CDC_Transmit_FS((uint8_t*)msg, strlen(msg));
+        }
         CDC_Transmit_FS((uint8_t*)string, strlen(string));
     }
 }
@@ -135,24 +152,24 @@ void Automated_Check() {
 int OC_check() {
     uint16_t reading = 0;
     int oc_setting = 0;
-    HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
-    reading = HAL_ADC_GetValue(&hadc1);
-    if (700 <= reading && reading <= 900){
+
+    HAL_ADC_Start(&hadc3);
+    HAL_ADC_PollForConversion(&hadc3, 10);
+    reading = HAL_ADC_GetValue(&hadc3);
+    HAL_ADC_Stop(&hadc3);
+
+    if (reading >= 700 && reading <= 900)
         oc_setting = 5;
-    }
-    else if (1400 <= reading && reading <= 1600){
+    else if (reading >= 1400 && reading <= 1600)
         oc_setting = 10;
-    }
-    else if (1850 <= reading && reading <= 2050){
+    else if (reading >= 1850 && reading <= 2050)
         oc_setting = 20;
-    }
-    else if (2150 <= reading && reading <= 2350){
+    else if (reading >= 2150 && reading <= 2350)
         oc_setting = 30;
-    }
-    else {
-        oc_setting = 0; // No OC Setting 
-    }
-    return oc_setting; // Return in Amperes
+    else
+        oc_setting = 0;
+
+    return oc_setting;
 }
 
 //	SSD1306 Data Display
@@ -369,7 +386,6 @@ void user_error_handler()
 {
     while (1)
     {
-        ssd1306_DisplayErrorMsg();
     }
 }
 
