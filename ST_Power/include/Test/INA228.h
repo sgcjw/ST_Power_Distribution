@@ -13,6 +13,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define INA228_ADDR_START 0x40
+#define INA228_ADDR_END   0x4C
+#define INA228_MAX_DEVICES 13
+
 //
 //	Registers
 //
@@ -135,6 +139,7 @@ uint16_t ina228_calibrationValue;
 int16_t ina228_currentDivider_mA;
 int16_t ina228_powerMultiplier_mW;
 
+uint8_t INA228_Scan(I2C_HandleTypeDef *i2c, uint8_t *found_list, uint8_t max_count);
 uint16_t INA228_Init(INA228_t *ina228, I2C_HandleTypeDef *i2c, uint8_t Address, float maxcurrent, float shunt, uint8_t bvct, uint8_t svct, uint8_t tct, uint16_t ppm);
 
 //

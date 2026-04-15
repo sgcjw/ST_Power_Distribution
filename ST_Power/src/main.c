@@ -389,15 +389,15 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Init.AutoRetransmission = DISABLE;
   hfdcan1.Init.TransmitPause = DISABLE;
   hfdcan1.Init.ProtocolException = DISABLE;
-  hfdcan1.Init.NominalPrescaler = 16;
+  hfdcan1.Init.NominalPrescaler = 2;
+  hfdcan1.Init.NominalTimeSeg1 = 13;
+  hfdcan1.Init.NominalTimeSeg2 = 2;
   hfdcan1.Init.NominalSyncJumpWidth = 1;
-  hfdcan1.Init.NominalTimeSeg1 = 1;
-  hfdcan1.Init.NominalTimeSeg2 = 1;
   hfdcan1.Init.DataPrescaler = 1;
   hfdcan1.Init.DataSyncJumpWidth = 1;
   hfdcan1.Init.DataTimeSeg1 = 1;
   hfdcan1.Init.DataTimeSeg2 = 1;
-  hfdcan1.Init.StdFiltersNbr = 0;
+  hfdcan1.Init.StdFiltersNbr = 1;
   hfdcan1.Init.ExtFiltersNbr = 0;
   hfdcan1.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
   if (HAL_FDCAN_Init(&hfdcan1) != HAL_OK)
@@ -405,6 +405,16 @@ static void MX_FDCAN1_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN FDCAN1_Init 2 */
+  FDCAN_FilterTypeDef sFilterConfig;
+
+  sFilterConfig.IdType = FDCAN_STANDARD_ID;
+  sFilterConfig.FilterIndex = 0;
+  sFilterConfig.FilterType = FDCAN_FILTER_MASK;
+  sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
+  sFilterConfig.FilterID1 = 0x000;   // accept all IDs
+  sFilterConfig.FilterID2 = 0x000;
+
+  HAL_FDCAN_ConfigFilter(&hfdcan1, &sFilterConfig);
 
   /* USER CODE END FDCAN1_Init 2 */
 

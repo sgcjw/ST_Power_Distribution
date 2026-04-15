@@ -10,6 +10,22 @@
 #include "main.h"
 #include "INA228.h"
 
+uint8_t INA228_Scan(I2C_HandleTypeDef *i2c, uint8_t *found_list, uint8_t max_count)
+{
+    uint8_t count = 0;
+
+    for (uint8_t addr = INA228_ADDR_START; addr <= INA228_ADDR_END; addr++)
+    {
+        if (HAL_I2C_IsDeviceReady(i2c, (addr << 1), 3, 10) == HAL_OK)
+        {
+            if (count < max_count)
+            {
+                found_list[count++] = addr;
+            }
+        }
+    }
+    return count;
+}
 
 /*
  * @brief:		Read a register from the IN228 sensor.
