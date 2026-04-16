@@ -25,6 +25,7 @@ void user_loop();
 void user_error_handler();
 
 // ADD OTHER HELPER FUNCTIONS HERE
+void Relay_CheckPresence();
 void Automated_Check();
 int OC_check();
 void ssd1306_DisplayData();

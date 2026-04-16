@@ -22,9 +22,6 @@ uint16_t FAULT_TYPE = 0; // 1 for overcurrent, 2 for overvoltage, 3 for undervol
 bool EN_TEST = false;
 bool OC_TEST = false;
 
-uint8_t RELAY_READY[MAX_RELAYS] = {0};
-uint8_t relay_addrs[MAX_RELAYS] = {0};
-
 float maxcurrent = 30.0;
 float shunt = 0.004f;
 uint8_t bvct = 3; // 280us bus voltage conversion time
@@ -42,6 +39,7 @@ int oc = 0;
 float voltage_buf[MAX_RELAYS] = {0};
 float current_buf[MAX_RELAYS] = {0};
 float temp_buf[MAX_RELAYS] = {0};
+bool PG_buf[MAX_RELAYS] = {0};
 
 //CAN Message Variables
 FDCAN_TxHeaderTypeDef TxHeader;
@@ -53,11 +51,24 @@ void user_setup()
     // ssd1306_DisplayOnMsg();
     // ssd1306_Init();
     // Automated_Check();
-    relay_count = INA228_Scan(&hi2c2, relay_addrs, MAX_RELAYS);
+    relay_count = 0;
+    scan_bus(&hi2c2);
+    scan_bus(&hi2c3);
+    Relay_CheckPresence();
     HAL_FDCAN_Start(&hfdcan1);
-    for (uint8_t i = 0; i < relay_count; i++) {
-        if (INA228_Init(&relay[i].ina, &hi2c2, relay_addrs[i], maxcurrent, shunt, bvct, svct, tct, ppm) == 1) {
-            relay[i].ready = 1;
+    for (uint8_t i = 0; i < MAX_RELAYS; i++)
+    {
+        uint8_t slot = Relay_Configure[i];
+        if (slot == 0) break;
+
+        if (relay[slot].i2c == NULL) continue;
+
+        if (INA228_Init(&relay[slot].ina,
+                        relay[slot].i2c,
+                        relay[slot].addr,
+                        maxcurrent, shunt, bvct, svct, tct, ppm))
+        {
+            relay[slot].ready = 1;
         }
     }
     // HAL_ADC_Start(&hadc1);
@@ -96,6 +107,10 @@ void user_loop()
         // if (HAL_FDCAN_GetTxFifoFreeLevel(&hfdcan1) > 0) {
         //     HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &TxHeader, TxData);
         // }
+        char msg[64];
+        sprintf(msg, "Heartbeat: System is alive\r\n");
+        CDC_Transmit_FS((uint8_t*)msg, strlen(msg));
+        HAL_Delay(5); // small delay to avoid USB buffer overflow
     }
     if (HAL_GetTick() - monitor_timer > MONITOR_TIMER)
     {
@@ -107,6 +122,7 @@ void user_loop()
             voltage_buf[i] = INA228_ReadBusVoltage(&relay[i].ina);
             current_buf[i] = INA228_ReadCurrent(&relay[i].ina, maxcurrent);
             temp_buf[i]    = INA228_getTemperature(&relay[i].ina);
+            PG_buf[i]      = RELAY_ReadPG(relay[i].slot);
         }
     }
     if (HAL_GetTick() - usb_timer > USB_TIMER) {
@@ -132,11 +148,13 @@ void user_loop()
 
             snprintf(msg, sizeof(msg),
                 "Relay[%d] ADDR:0x%02X\r\n"
+                "  PG: %s\r\n"
                 "  V: %d.%03d V\r\n"
                 "  C: %d.%03d A\r\n"
                 "  T: %d.%03d C\r\n\r\n",
                 i,
-                relay_addrs[i],
+                relay[i].addr,
+                PG_buf[i] ? "ON" : "OFF",
                 v_i, v_f,
                 c_i, c_f,
                 t_i, t_f
@@ -155,32 +173,68 @@ void user_loop()
 }
 
 // Automated Check Function at startup
-void Automated_Check() {
-    // Implement automated checks needed at startup
-    ssd1306_DisplayENTestMsg();
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET); // Set PA5 high to enable relay
-    HAL_Delay(500); // Wait for relay to turn on
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET); // Set PA5 low to test latching functionality
-    HAL_Delay(500); // Wait for relay to latch
-    if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7) == GPIO_PIN_RESET) {
-        user_error_handler(); // Relay did not enable successfully, handle error
+// void Automated_Check() {
+//     // Implement automated checks needed at startup
+//     ssd1306_DisplayENTestMsg();
+//     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET); // Set PA5 high to enable relay
+//     HAL_Delay(500); // Wait for relay to turn on
+//     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET); // Set PA5 low to test latching functionality
+//     HAL_Delay(500); // Wait for relay to latch
+//     if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7) == GPIO_PIN_RESET) {
+//         user_error_handler(); // Relay did not enable successfully, handle error
+//     }
+//     else{
+//         EN_TEST = true;
+//         ssd1306_DisplayENTestMsg();
+//     }
+//     ssd1306_DisplayOCTestMsg();
+//     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET); // Set PA6 high to trigger OC Test
+//     HAL_Delay(500); // Wait for OC test to register
+//     if ((HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0) == GPIO_PIN_RESET) || (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7) == GPIO_PIN_SET)) {
+//         user_error_handler(); // Proetction did not trigger, handle error
+//     }
+//     else{
+//         OC_TEST = true;
+//         ssd1306_DisplayOCTestMsg();
+//     }
+//     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET); // Reset OC Test
+//     HAL_Delay(500); // Wait for system to stabilize
+// }
+
+void Relay_CheckPresence(void)
+{
+    char msg[64];
+
+    sprintf(msg, "\r\n===== RELAY PRESENCE CHECK =====\r\n");
+    CDC_Transmit_FS((uint8_t*)msg, strlen(msg));
+    HAL_Delay(5);
+
+    for (uint8_t i = 0; i < MAX_RELAYS; i++)
+    {
+        uint8_t slot = Relay_Configure[i];
+
+        // stop when list ends (0 terminator)
+        if (slot == 0)
+            break;
+
+        // Was slot discovered during scan?
+        if (relay[slot].i2c == NULL)
+        {
+            sprintf(msg, "relay[%d] is MISSING\r\n", slot);
+            CDC_Transmit_FS((uint8_t*)msg, strlen(msg));
+            HAL_Delay(5);
+            continue;
+        }
+        else{
+            sprintf(msg, "relay[%d] found at I2C 0x%02X\r\n", slot, relay[slot].addr);
+            CDC_Transmit_FS((uint8_t*)msg, strlen(msg));
+            HAL_Delay(5);
+        }
     }
-    else{
-        EN_TEST = true;
-        ssd1306_DisplayENTestMsg();
-    }
-    ssd1306_DisplayOCTestMsg();
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET); // Set PA6 high to trigger OC Test
-    HAL_Delay(500); // Wait for OC test to register
-    if ((HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0) == GPIO_PIN_RESET) || (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7) == GPIO_PIN_SET)) {
-        user_error_handler(); // Proetction did not trigger, handle error
-    }
-    else{
-        OC_TEST = true;
-        ssd1306_DisplayOCTestMsg();
-    }
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET); // Reset OC Test
-    HAL_Delay(500); // Wait for system to stabilize
+
+    sprintf(msg, "================================\r\n\r\n");
+    CDC_Transmit_FS((uint8_t*)msg, strlen(msg));
+    HAL_Delay(5);
 }
 
 // Overcurrent setting check function
