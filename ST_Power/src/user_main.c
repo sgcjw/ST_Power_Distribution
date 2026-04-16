@@ -38,8 +38,8 @@ void user_setup()
 {
     MX_USB_DEVICE_Init();    // MUST be called after MX_USB_PCD_Init()
     // ADD SETUP CODE HERE
-    ssd1306_DisplayOnMsg();
     ssd1306_Init();
+    ssd1306_DisplayOnMsg();
     if (INA228_Init(&ina228, &hi2c1, ina228_address, maxcurrent, shunt, bvct, svct, tct, ppm) == 1) {
         ssd1306_DisplayReadyMsg();
     }
@@ -371,7 +371,7 @@ void EXTI0_IRQHandler(void)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-    fault_current = INA228_ReadCurrent(&ina228, maxcurrent);
+    fault_current = current;
     // //to bypass undervoltage when no voltage readings
     // fault_voltage = 20000;
     fault_voltage = voltage;
