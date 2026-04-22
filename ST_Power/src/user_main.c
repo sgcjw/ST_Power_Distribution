@@ -22,24 +22,19 @@ uint16_t FAULT_TYPE = 0; // 1 for overcurrent, 2 for overvoltage, 3 for undervol
 bool EN_TEST = false;
 bool OC_TEST = false;
 
-float maxcurrent = 30.0;
-float shunt = 0.004f;
-uint8_t bvct = 3; // 280us bus voltage conversion time
-uint8_t svct = 5; // 1052us shunt voltage conversion time
-uint8_t tct = 3;  // 280us temperature conversion time
-uint16_t ppm = 200; // 200 ppm temperature coefficent
+
 uint16_t id = 0;
 float current = 0;
 float fault_current = 0;
 float voltage = 0;
 float fault_voltage = 0;
-// float shunt_voltage = 0;
 float temp = 0;
 int oc = 0;
 float voltage_buf[MAX_RELAYS] = {0};
 float current_buf[MAX_RELAYS] = {0};
 float temp_buf[MAX_RELAYS] = {0};
 bool PG_buf[MAX_RELAYS] = {0};
+float OC_thresholds_buf[MAX_RELAYS] = {0};
 
 //CAN Message Variables
 FDCAN_TxHeaderTypeDef TxHeader;
@@ -52,25 +47,12 @@ void user_setup()
     // ssd1306_Init();
     // Automated_Check();
     relay_count = 0;
+    Relay_BeginRefresh();
     scan_bus(&hi2c2);
     scan_bus(&hi2c3);
-    Relay_CheckPresence();
+    Relay_EndRefresh();
+    // Relay_CheckPresence();
     HAL_FDCAN_Start(&hfdcan1);
-    for (uint8_t i = 0; i < MAX_RELAYS; i++)
-    {
-        uint8_t slot = Relay_Configure[i];
-        if (slot == 0) break;
-
-        if (relay[slot].i2c == NULL) continue;
-
-        if (INA228_Init(&relay[slot].ina,
-                        relay[slot].i2c,
-                        relay[slot].addr,
-                        maxcurrent, shunt, bvct, svct, tct, ppm))
-        {
-            relay[slot].ready = 1;
-        }
-    }
     // HAL_ADC_Start(&hadc1);
     // HAL_ADC_Start(&hadc2);
     HAL_ADC_Start(&hadc3);
@@ -115,19 +97,23 @@ void user_loop()
     if (HAL_GetTick() - monitor_timer > MONITOR_TIMER)
     {
         monitor_timer = HAL_GetTick();
-        for (uint8_t i = 0; i < relay_count; i++)
+        Relay_BeginRefresh();
+        scan_bus(&hi2c2);
+        scan_bus(&hi2c3);
+        Relay_EndRefresh();
+        for (uint8_t i = 0; i < MAX_RELAYS; i++)
         {
             if (!relay[i].ready) continue;
             // store latest values ONLY
             voltage_buf[i] = INA228_ReadBusVoltage(&relay[i].ina);
-            current_buf[i] = INA228_ReadCurrent(&relay[i].ina, maxcurrent);
+            current_buf[i] = INA228_ReadCurrent(&relay[i].ina, 30);
             temp_buf[i]    = INA228_getTemperature(&relay[i].ina);
             PG_buf[i]      = RELAY_ReadPG(relay[i].slot);
         }
     }
     if (HAL_GetTick() - usb_timer > USB_TIMER) {
         usb_timer = HAL_GetTick();
-        for (uint8_t i = 0; i < relay_count; i++)
+        for (uint8_t i = 0; i < MAX_RELAYS; i++)
         {
             if (!relay[i].ready) continue;
 

@@ -17,10 +17,7 @@ typedef struct {
     uint8_t slot;
 
     uint8_t ready;
-
-    float voltage;
-    float current;
-    float temp;
+    uint8_t present;
 
     uint8_t pg;
     uint8_t fault;
@@ -67,7 +64,7 @@ typedef struct {
     uint16_t pin;
 } GPIO_Map_t;
 
-static const GPIO_Map_t pg_map[MAX_RELAYS] = {
+static const GPIO_Map_t pg_map[] = {
     [1]  = {GPIOA, GPIO_PIN_15},
     [2]  = {GPIOC, GPIO_PIN_0},
     [3]  = {GPIOA, GPIO_PIN_10},
@@ -102,6 +99,8 @@ extern uint8_t relay_count;
 extern uint8_t Relay_Configure[MAX_RELAYS];
 
 void scan_bus(I2C_HandleTypeDef *i2c);
+void Relay_BeginRefresh(void);
+void Relay_EndRefresh(void);
 uint8_t RELAY_ReadPG(uint8_t slot);
 
 #endif
