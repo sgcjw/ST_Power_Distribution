@@ -16,13 +16,13 @@ bool FAULT = false;
 bool EN_TEST = false;
 bool OC_TEST = false;
 
-INA228_t *ina228;
+INA228_t ina228;
 uint8_t ina228_address = 0x40;
 float maxcurrent = 30.0;
 float shunt = 0.001f;
-uint8_t bvct = 1; // 84us bus voltage conversion time
-uint8_t svct = 2; // 150us shunt voltage conversion time
-uint8_t tct = 1;  // 84us temperature conversion time
+uint8_t bvct = 3; // us bus voltage conversion time
+uint8_t svct = 5; // us shunt voltage conversion time
+uint8_t tct = 3;  // us temperature conversion time
 uint16_t ppm = 200; // 200 ppm temperature coefficent
 uint16_t id = 0;
 float current = 0;
