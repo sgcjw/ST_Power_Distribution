@@ -109,6 +109,7 @@ void user_loop()
             current_buf[i] = INA228_ReadCurrent(&relay[i].ina, 30);
             temp_buf[i]    = INA228_getTemperature(&relay[i].ina);
             PG_buf[i]      = RELAY_ReadPG(relay[i].slot);
+            OC_thresholds_buf[i] = RELAY_ReadOC(relay[i].slot);
         }
     }
     if (HAL_GetTick() - usb_timer > USB_TIMER) {
@@ -120,6 +121,7 @@ void user_loop()
             float v = voltage_buf[i];
             float c = current_buf[i];
             float t = temp_buf[i];
+            uint16_t oc = OC_thresholds_buf[i];
 
             char msg[128];
 
@@ -137,13 +139,15 @@ void user_loop()
                 "  PG: %s\r\n"
                 "  V: %d.%03d V\r\n"
                 "  C: %d.%03d A\r\n"
-                "  T: %d.%03d C\r\n\r\n",
+                "  T: %d.%03d C\r\n"
+                "  OC: %d A\r\n\r\n",
                 i,
                 relay[i].addr,
                 PG_buf[i] ? "ON" : "OFF",
                 v_i, v_f,
                 c_i, c_f,
-                t_i, t_f
+                t_i, t_f,
+                oc
             );
 
             CDC_Transmit_FS((uint8_t*)msg, strlen(msg));

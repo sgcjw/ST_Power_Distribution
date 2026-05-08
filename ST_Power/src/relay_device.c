@@ -72,3 +72,41 @@ uint8_t RELAY_ReadPG(uint8_t slot)
     return HAL_GPIO_ReadPin(pg_map[slot].port,
                              pg_map[slot].pin);
 }
+
+uint8_t RELAY_ReadFault(uint8_t slot)
+{
+    return HAL_GPIO_ReadPin(fault_map[slot].port,
+                             fault_map[slot].pin);
+}
+
+uint16_t RELAY_ReadOC(uint8_t slot)
+{
+    if (slot >= MAX_RELAYS)
+        return 0;
+
+    ADC_ChannelConfTypeDef sConfig = {0};
+
+    sConfig.Channel = oc_map[slot].channel;
+    sConfig.Rank = ADC_REGULAR_RANK_1;
+    sConfig.SamplingTime = ADC_SAMPLETIME_47CYCLES_5;
+
+    HAL_ADC_ConfigChannel(oc_map[slot].hadc, &sConfig);
+
+    HAL_ADC_Start(oc_map[slot].hadc);
+    HAL_ADC_PollForConversion(oc_map[slot].hadc, 10);
+
+    uint16_t value = HAL_ADC_GetValue(oc_map[slot].hadc);
+
+    HAL_ADC_Stop(oc_map[slot].hadc);
+
+    if (value >= 2300 && value <= 2450)
+        return 5;
+    else if (value >= 2700 && value <= 2850)
+        return 10;
+    else if (value >= 2950 && value <= 3100)
+        return 20;
+    else if (value >= 3150 && value <= 3300)
+        return 30;
+    else
+        return 0;
+}

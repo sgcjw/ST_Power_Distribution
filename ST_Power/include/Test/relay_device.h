@@ -8,6 +8,9 @@
 
 extern I2C_HandleTypeDef hi2c2;
 extern I2C_HandleTypeDef hi2c3;
+extern ADC_HandleTypeDef hadc1;
+extern ADC_HandleTypeDef hadc2;
+extern ADC_HandleTypeDef hadc3;
 
 typedef struct {
     I2C_HandleTypeDef *i2c;
@@ -93,6 +96,69 @@ static const GPIO_Map_t pg_map[] = {
     [26] = {GPIOE, GPIO_PIN_5},
 };
 
+static const GPIO_Map_t fault_map[] = {
+    [1]  = {GPIOC, GPIO_PIN_10},
+    [2]  = {GPIOB, GPIO_PIN_1},
+    [3]  = {GPIOB, GPIO_PIN_1},
+    [4]  = {GPIOF, GPIO_PIN_11},
+    [5]  = {GPIOC, GPIO_PIN_12},
+    [6]  = {GPIOB, GPIO_PIN_2},
+    [7]  = {GPIOB, GPIO_PIN_3},
+    [8]  = {GPIOA, GPIO_PIN_4},
+    [9]  = {GPIOB, GPIO_PIN_4},
+    [10] = {GPIOA, GPIO_PIN_3},
+    [11] = {GPIOE, GPIO_PIN_15},
+    [12] = {GPIOA, GPIO_PIN_2},
+    [13] = {GPIOB, GPIO_PIN_6},
+    [14] = {GPIOB, GPIO_PIN_3 },
+    [15] = {GPIOB, GPIO_PIN_7},
+    [16] = {GPIOA, GPIO_PIN_0},
+    [17] = {GPIOC, GPIO_PIN_6},
+    [18] = {GPIOC, GPIO_PIN_6},
+    [19] = {GPIOB, GPIO_PIN_9},
+    [20] = {GPIOE, GPIO_PIN_1},
+    [21] = {GPIOB, GPIO_PIN_10},
+    [22] = {GPIOE, GPIO_PIN_2},
+    [23] = {GPIOD, GPIO_PIN_10},
+    [24] = {GPIOE, GPIO_PIN_4},
+    [25] = {GPIOC, GPIO_PIN_9},
+    [26] = {GPIOE, GPIO_PIN_6},
+};
+
+typedef struct {
+    ADC_HandleTypeDef *hadc;
+    uint32_t channel;
+} Analog_Map_t;
+
+static const Analog_Map_t oc_map[] = {
+    [1]  = {&hadc3, ADC_CHANNEL_10}, //PD13
+    [2]  = {&hadc1, ADC_CHANNEL_1}, //PA1
+    [3]  = {&hadc3, ADC_CHANNEL_11}, //PD14
+    [4]  = {&hadc1, ADC_CHANNEL_0}, //PA0
+    [5]  = {&hadc3, ADC_CHANNEL_8}, //PD11
+    [6]  = {&hadc1, ADC_CHANNEL_3}, //PA3
+    [7]  = {&hadc3, ADC_CHANNEL_2}, //PE9
+    [8]  = {&hadc1, ADC_CHANNEL_2}, //PA2
+    [9]  = {&hadc3, ADC_CHANNEL_16}, //PE12
+    [10] = {&hadc2, ADC_CHANNEL_13}, //PA5
+    [11] = {&hadc3, ADC_CHANNEL_15}, //PE11
+    [12] = {&hadc2, ADC_CHANNEL_17}, //PA4
+    [13] = {&hadc3, ADC_CHANNEL_3}, //PE13
+    [14] = {&hadc2, ADC_CHANNEL_4}, //PA7
+    [15] = {&hadc1, ADC_CHANNEL_11}, //PB12
+    [16] = {&hadc2, ADC_CHANNEL_3}, //PA6
+    [17] = {&hadc1, ADC_CHANNEL_14}, //PB11
+    [18] = {&hadc2, ADC_CHANNEL_11}, //PC5
+    [19] = {&hadc1, ADC_CHANNEL_5}, //PB14
+    [20] = {&hadc2, ADC_CHANNEL_5}, //PC4
+    [21] = {&hadc3, ADC_CHANNEL_5}, //PB13
+    [22] = {&hadc3, ADC_CHANNEL_6}, //PE8
+    [23] = {&hadc3, ADC_CHANNEL_7}, //PD10
+    [24] = {&hadc3, ADC_CHANNEL_4}, //PE7
+    [25] = {&hadc3, ADC_CHANNEL_9}, //PD12
+    [26] = {&hadc3, ADC_CHANNEL_14}, //PE10
+};
+
 // Shared global array
 extern relay_device_t relay[MAX_RELAYS];
 extern uint8_t relay_count;
@@ -102,5 +168,7 @@ void scan_bus(I2C_HandleTypeDef *i2c);
 void Relay_BeginRefresh(void);
 void Relay_EndRefresh(void);
 uint8_t RELAY_ReadPG(uint8_t slot);
+uint8_t RELAY_ReadFault(uint8_t slot);
+uint16_t RELAY_ReadOC(uint8_t slot);
 
 #endif
