@@ -108,7 +108,6 @@ enum ina228_timing_enum {
 
 
 //  for diagnose/alert() bit fields.
-//  TODO bit masks?
 enum ina228_diag_enum {
   INA228_DIAG_MEMORY_STATUS      = 0,
   INA228_DIAG_CONVERT_COMPLETE   = 1,
@@ -160,16 +159,6 @@ uint32_t INA228_ReadPower(INA228_t *ina228);
 //       TEMPERATURE
 float   INA228_getTemperature(INA228_t *ina228);    //  Celsius
 
-// //  the Energy and Charge functions are returning double as they have higher accuracy.
-// //       ENERGY
-// double   getEnergy();         //  Joule or watt second
-// double   getJoule()           { return getEnergy(); };
-
-
-// //       CHARGE
-// double   getCharge();         //  Coulombs
-// double   getCoulomb()         { return getCharge(); };
-
 //       Timer
 int      INA228_GetDeltaTime_ms();
 
@@ -178,19 +167,6 @@ int      INA228_GetDeltaTime_ms();
 //  read datasheet for details, section 7.6.1.1, page 22
 //
 void     INA228_Reset(INA228_t *ina228);
-//  value: 0 == normal operation,  1 = clear registers
-// //   bool     resetEnergyCharge(uint8_t value);  better name for setAccumulation()??
-// //  [[deprecated("Use ")]]  ??
-// bool     setAccumulation(uint8_t value);  //  idem
-// bool     getAccumulation();
-// //  Conversion delay in 0..255 steps of 2 ms
-// void     setConversionDelay(uint8_t steps);
-// uint8_t  getConversionDelay();
-// void     setTemperatureCompensation(bool on);
-// bool     getTemperatureCompensation();
-// //  flag = false => 164 mV, true => 41 mV
-// bool     setADCRange(bool flag);
-// bool     getADCRange();
 
 // //
 // //  CONFIG ADC REGISTER 1
@@ -198,25 +174,6 @@ void     INA228_Reset(INA228_t *ina228);
 void INA228_setBusVoltageConversionTime(INA228_t *ina228, uint8_t bvct);
 void INA228_setShuntVoltageConversionTime(INA228_t *ina228, uint8_t svct);
 void INA228_setTemperatureConversionTime(INA228_t *ina228, uint8_t tct);
-
-// //
-// //  SHUNT CALIBRATION REGISTER 2
-// //  read datasheet for details. use with care.
-// //  maxCurrent <= 204, (in fact no limit)
-// //  shunt >= 0.0001.
-// //  returns error code => 0 == OK;
-// int      setMaxCurrentShunt(float maxCurrent, float shunt);
-// float    getMaxCurrent();
-// float    getShunt();
-// float    getCurrentLSB();  //  <= 0.0 means not calibrated.
-
-// //
-// //  SHUNT TEMPERATURE COEFFICIENT REGISTER 3
-// //  read datasheet for details, page 16.
-// //  ppm = 0..16383.
-// //bool     setShuntTemperatureCoefficent(uint16_t ppm = 0);
-// bool     setShuntTemperatureCoefficent(uint16_t ppm);
-// uint16_t getShuntTemperatureCoefficent();
 
 
 // //
@@ -243,14 +200,10 @@ void INA228_setTemperatureOverLimitTH(INA228_t *ina228, float threshold);
 uint16_t INA228_getDieID();         //  0x0228
 // uint16_t getRevision();      //  0x0001
 
-// //
-// //  ERROR HANDLING
-// //
-// int      getLastError();
-
 void INA228_setCalibration(INA228_t *ina228, float maxCurrent, float shunt);
 void INA228_setTemperatureCompensation(INA228_t *ina228, bool on);
 void INA228_setShuntTemperatureCoefficent(INA228_t *ina228, uint16_t ppm);
+
 uint16_t Read16(INA228_t *ina228, uint8_t Register);
 HAL_StatusTypeDef Write16(INA228_t *ina228, uint8_t Register, uint16_t Value);
 

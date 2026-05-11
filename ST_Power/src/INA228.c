@@ -10,10 +10,18 @@
 #include "main.h"
 #include "INA228.h"
 
+/**
+ * @brief 	Scans the I2C bus for INA228 devices. Record any found devices in the provided found_list array.
+ * @param i2c 
+ * @param found_list 
+ * @param max_count 
+ * @return uint8_t 
+ */
+
 uint8_t INA228_Scan(I2C_HandleTypeDef *i2c, uint8_t *found_list, uint8_t max_count)
 {
     uint8_t count = 0;
-
+	// INA228 has 16 possible I2C addresses from 0x40 (INA228_ADDR_START) to 0x4F (INA228_ADDR_END)
     for (uint8_t addr = INA228_ADDR_START; addr <= INA228_ADDR_END; addr++)
     {
         if (HAL_I2C_IsDeviceReady(i2c, (addr << 1), 3, 10) == HAL_OK)
@@ -27,9 +35,8 @@ uint8_t INA228_Scan(I2C_HandleTypeDef *i2c, uint8_t *found_list, uint8_t max_cou
     return count;
 }
 
-/*
- * @brief:		Read a register from the IN228 sensor.
- * @param:		Pointer to the device object that was made from the struct. EX:  (&ina228)
+/** @brief:		Read a register from the IN228 sensor.
+ * @param:		Pointer to the device object that was made from the struct.
  * @param:		register address in hexadecimal
  * @retval:		24 bit/16 bit unsigned integer that represents the register's contents.
  */
@@ -67,7 +74,7 @@ uint32_t Read24(INA228_t *ina228, uint8_t Register)
            (uint32_t)Value[2];
 }
 
-/*
+/**
  * @brief:		Write to a register on the IN228 sensor.
  * @param:		Pointer to the device object that was made from the struct. EX:  (&ina228)
  * @param:		Register address in hexadecimal
@@ -82,6 +89,7 @@ uint32_t Read24(INA228_t *ina228, uint8_t Register)
 				  HAL_TIMEOUT  = 0x03U
 				} HAL_StatusTypeDef;
  */
+
 HAL_StatusTypeDef Write16(INA228_t *ina228, uint8_t Register, uint16_t Value)
 {
 	uint8_t addr[2];
@@ -90,6 +98,21 @@ HAL_StatusTypeDef Write16(INA228_t *ina228, uint8_t Register, uint16_t Value)
 	return HAL_I2C_Mem_Write(ina228->ina228_i2c, (ina228->Address<<1), Register, 1, (uint8_t*)addr, 2, 1000);
 }
 
+/**
+ * @brief Initializes the INA228 device with the provided settings.
+ * This function should be called everytime at system start-up or whenever a new INA228 device is detected on the I2C bus.
+ * Future improvement: do a reading of the Relay's OC setting first then initialise the maxcurrent parameter
+ * @param ina228 
+ * @param i2c 
+ * @param Address 
+ * @param maxcurrent 
+ * @param shunt 
+ * @param bvct 
+ * @param svct 
+ * @param tct 
+ * @param ppm 
+ * @return uint16_t 
+ */
 uint16_t INA228_Init(INA228_t *ina228, I2C_HandleTypeDef *i2c, uint8_t Address, float maxcurrent, float shunt, uint8_t bvct, uint8_t svct, uint8_t tct, uint16_t ppm)
 {
 	ina228->ina228_i2c = i2c;
@@ -120,7 +143,7 @@ uint16_t INA228_Init(INA228_t *ina228, I2C_HandleTypeDef *i2c, uint8_t Address, 
 	}
 }
 
-/*
+/**
  * @brief: 		This function will read the bus voltage level.
  * @param:		Pointer to the device object that was made from the struct. EX:  (&ina228)
  * @retval:		Returns voltage level in mili-volts
@@ -134,8 +157,8 @@ float INA228_ReadBusVoltage(INA228_t *ina228)
   	return voltage;
 }
 
-/*
- *  @brief:	  	Gets the raw current value (24-bit signed integer, so +-8388607)
+/** 
+ * @brief:	  	Gets the raw current value (24-bit signed integer, so +-8388607)
  *  @param:		Pointer to the device object that was made from the struct. EX:  (&ina228)
  *  @retval:	The raw current reading
  */
@@ -146,7 +169,7 @@ uint32_t INA228_ReadCurrent_raw(INA228_t *ina228)
 	return (result);
 }
 
-/*
+/** 
  * @brief:  	Gets the current value in mA, taking into account the
  *          	config settings and current LSB
  * @param:		Pointer to the device object that was made from the struct. EX:  (&ina228)
@@ -162,7 +185,7 @@ float INA228_ReadCurrent(INA228_t *ina228, float maxCurrent)
 	return (result * current_LSB); // current is the raw current times the current_LSB
 }
 
-/*
+/**
  * @brief: 		This function will read the shunt voltage level.
  * @param:		Pointer to the device object that was made from the struct. EX:  (&ina228)
  * @retval:		Returns voltage level in mili-volts. This value represents the difference
@@ -175,7 +198,8 @@ float INA228_ReadShuntVoltage(INA228_t *ina228)
 
 	return (result * 312.5e-6); // shunt voltage in mV is the register value times the shunt_LSB (312.5nV)
 }
-/*
+
+/**
  * @brief: 	This reads the power register then multiplies it by the power multiplier.
  * 			Power multiplier is initialize in the calibration function.
  * @param:	Pointer to the device object that was made from the struct. EX:  (&ina228)
@@ -188,6 +212,11 @@ uint32_t INA228_ReadPower(INA228_t *ina228)
 	return (result);
 }
 
+/**
+ * @brief: 	This reads the temperature register and converts it to degrees Celsius.
+ * @param:	Pointer to the device object that was made from the struct. EX:  (&ina228)
+ * @retval:	Returns temperature in degrees Celsius
+ */
 float INA228_getTemperature(INA228_t *ina228)
 {
   uint16_t value = Read16(ina228, INA228_TEMPERATURE);
@@ -195,11 +224,16 @@ float INA228_getTemperature(INA228_t *ina228)
   return value * LSB;
 }
 
+/**
+ * @brief: 	This reads the device ID register and returns the die ID.
+ * @param:	Pointer to the device object that was made from the struct. EX:  (&ina228)
+ * @retval:	Returns the die ID, which should be 0x0228 for the INA228
+ */
 uint16_t INA228_getDieID(INA228_t *ina228){
 	return (Read24(ina228, INA228_DEVICE_ID)>> 4) & 0x0FFF;
 }
 
-/*
+/**
  * @brief: get Delta time in mili-seconds which is the difference between the last time you called this function and now
  */
 int lastTime,deltaTime,now;
@@ -212,13 +246,22 @@ int INA228_GetDeltaTime_ms()
 	  return deltaTime;
 }
 
+/**
+ * @brief: 	This function resets the INA228 device.
+ * @param:	Pointer to the device object that was made from the struct. EX:  (&ina228)
+ */
 void INA228_Reset(INA228_t *ina228)
 {
 	Write16(ina228, INA228_CONFIG, INA228_CFG_RST);
 	HAL_Delay(1);
 }
 
-//set configuration
+/**
+ * @brief 	This function sets the calibration register based on the provided max current and shunt resistor values. Called during INA228 initialization.
+ * @param ina228 
+ * @param maxCurrent 
+ * @param shunt 
+ */
 void INA228_setCalibration(INA228_t *ina228, float maxCurrent, float shunt)
 {
 	// set calibration register
@@ -230,6 +273,11 @@ void INA228_setCalibration(INA228_t *ina228, float maxCurrent, float shunt)
     Write16(ina228, INA228_SHUNT_CAL, (uint16_t)shunt_cal);
 }
 
+/**
+ * @brief This function sets the bus voltage conversion time in the ADC configuration register.
+ * @param ina228 
+ * @param bvct 
+ */
 void INA228_setBusVoltageConversionTime(INA228_t *ina228, uint8_t bvct)
 {
   uint16_t value = Read16(ina228, INA228_ADC_CONFIG);
@@ -238,6 +286,11 @@ void INA228_setBusVoltageConversionTime(INA228_t *ina228, uint8_t bvct)
   Write16(ina228, INA228_ADC_CONFIG, value);
 }
 
+/**
+ * @brief This function sets the shunt voltage conversion time in the ADC configuration register.
+ * @param ina228 
+ * @param svct 
+ */
 void INA228_setShuntVoltageConversionTime(INA228_t *ina228, uint8_t svct)
 {
   uint16_t value = Read16(ina228, INA228_ADC_CONFIG);
@@ -246,6 +299,11 @@ void INA228_setShuntVoltageConversionTime(INA228_t *ina228, uint8_t svct)
   Write16(ina228, INA228_ADC_CONFIG, value);
 }
 
+/**
+ * @brief This function sets the temperature conversion time in the ADC configuration register.
+ * @param ina228 
+ * @param tct 
+ */
 void INA228_setTemperatureConversionTime(INA228_t *ina228, uint8_t tct)
 {
   uint16_t value = Read16(ina228, INA228_ADC_CONFIG);
@@ -254,6 +312,11 @@ void INA228_setTemperatureConversionTime(INA228_t *ina228, uint8_t tct)
   Write16(ina228, INA228_ADC_CONFIG, value);
 }
 
+/**
+ * @brief This function enables or disables temperature compensation in the configuration register.
+ * @param ina228 
+ * @param on 
+ */
 void INA228_setTemperatureCompensation(INA228_t *ina228, bool on)
 {
   uint16_t value = Read16(ina228, INA228_CONFIG);
@@ -262,6 +325,11 @@ void INA228_setTemperatureCompensation(INA228_t *ina228, bool on)
   Write16(ina228, INA228_CONFIG, value);
 }
 
+/**
+ * @brief This function sets the shunt temperature coefficient in the corresponding register.
+ * @param ina228 
+ * @param ppm 
+ */
 void INA228_setShuntTemperatureCoefficent(INA228_t *ina228, uint16_t ppm)
 {
   Write16(ina228, INA228_SHUNT_TEMP_CO, ppm);

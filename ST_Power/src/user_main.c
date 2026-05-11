@@ -10,31 +10,27 @@ extern ADC_HandleTypeDef hadc3;
 extern FDCAN_HandleTypeDef hfdcan1;
 
 // ADD YOUR INCLUDES HERE
-uint32_t screen_timer = 0;
-uint32_t hb_timer = 0;
-uint32_t monitor_timer = 0;
-uint32_t usb_timer = 0;
+uint32_t hb_timer = 0; // Timer for heartbeat messages
+uint32_t monitor_timer = 0; // Timer for monitoring relay status
+uint32_t usb_timer = 0; // Timer for USB status messages
 
-bool PG = true;
-bool FAULT = false;
-bool FAULT_CHECK = false;
+bool PG = true; // Power Good status, true means relay is ON and power is good
+bool FAULT = false; // Fault status, true means a fault has been detected
+bool FAULT_CHECK = false; // Flag to indicate if fault checking is in progress
 uint16_t FAULT_TYPE = 0; // 1 for overcurrent, 2 for overvoltage, 3 for undervoltage, 4 for overtemperature
-bool EN_TEST = false;
-bool OC_TEST = false;
 
 
-uint16_t id = 0;
-float current = 0;
-float fault_current = 0;
-float voltage = 0;
-float fault_voltage = 0;
-float temp = 0;
-int oc = 0;
-float voltage_buf[MAX_RELAYS] = {0};
-float current_buf[MAX_RELAYS] = {0};
-float temp_buf[MAX_RELAYS] = {0};
-bool PG_buf[MAX_RELAYS] = {0};
-float OC_thresholds_buf[MAX_RELAYS] = {0};
+float current = 0; // Latest current reading
+float fault_current = 0; // Latest current reading at the time of fault detection, used for diagnostics
+float voltage = 0; // Latest voltage reading
+float fault_voltage = 0; // Latest voltage reading at the time of fault detection, used for diagnostics
+float temp = 0; // Latest temperature reading
+int oc = 0; // Overcurrent threshold setting
+float voltage_buf[MAX_RELAYS] = {0}; // Buffer to store latest voltage readings for all relays
+float current_buf[MAX_RELAYS] = {0}; // Buffer to store latest current readings for all relays
+float temp_buf[MAX_RELAYS] = {0}; // Buffer to store latest temperature readings for all relays
+bool PG_buf[MAX_RELAYS] = {0}; // Buffer to store latest Power Good status for all relays
+float OC_thresholds_buf[MAX_RELAYS] = {0}; // Buffer to store latest Overcurrent threshold settings for all relays
 
 //CAN Message Variables
 FDCAN_TxHeaderTypeDef TxHeader;
@@ -43,13 +39,10 @@ uint8_t TxData[8];
 void user_setup()
 {
     // ADD SETUP CODE HERE
-    // ssd1306_DisplayOnMsg();
-    // ssd1306_Init();
-    // Automated_Check();
     relay_count = 0;
-    Relay_BeginRefresh();
-    scan_bus(&hi2c2);
-    scan_bus(&hi2c3);
+    Relay_BeginRefresh(); 
+    scan_bus(&hi2c2); // Scan first I2C bus to detect any relays connected to it
+    scan_bus(&hi2c3); // Scan second I2C bus to detect any relays connected to it
     Relay_EndRefresh();
     // Relay_CheckPresence();
     HAL_FDCAN_Start(&hfdcan1);
@@ -65,15 +58,14 @@ void user_setup()
     // TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
     // TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
     // TxHeader.MessageMarker = 0;
-    // __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_7);
-    // __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_0);
-    // HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-    // HAL_NVIC_EnableIRQ(EXTI0_IRQn);
 }
 
 void user_loop()
 {
-    // ADD LOOP CODE HERE
+    /**
+     * @brief Every HB_TIMER milliseconds
+     * Toggle the onboard LED to indicate the system is alive and optionally send a heartbeat message over CAN or USB. 
+     */
     if (HAL_GetTick() - hb_timer > HB_TIMER) {
         hb_timer = HAL_GetTick();
         HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
@@ -94,6 +86,11 @@ void user_loop()
         CDC_Transmit_FS((uint8_t*)msg, strlen(msg));
         HAL_Delay(5); // small delay to avoid USB buffer overflow
     }
+    /**
+     * @brief Every MONITOR_TIMER milliseconds, 
+     * Read the status of all connected relays and store the latest readings in buffers. 
+     * These buffers will be used to send status updates over USB in the next section. 
+     */
     if (HAL_GetTick() - monitor_timer > MONITOR_TIMER)
     {
         monitor_timer = HAL_GetTick();
@@ -104,7 +101,7 @@ void user_loop()
         for (uint8_t i = 0; i < MAX_RELAYS; i++)
         {
             if (!relay[i].ready) continue;
-            // store latest values ONLY
+            // store latest readings in buffers for all relays, these will be sent over USB in the next section
             voltage_buf[i] = INA228_ReadBusVoltage(&relay[i].ina);
             current_buf[i] = INA228_ReadCurrent(&relay[i].ina, 30);
             temp_buf[i]    = INA228_getTemperature(&relay[i].ina);
@@ -112,12 +109,16 @@ void user_loop()
             OC_thresholds_buf[i] = RELAY_ReadOC(relay[i].slot);
         }
     }
+    /**
+     * @brief Every USB_TIMER milliseconds, 
+     * Send the latest status of all relays over USB in a human-readable format. 
+     * This includes voltage, current, temperature, Power Good status, and Overcurrent threshold settings for each relay. 
+     */
     if (HAL_GetTick() - usb_timer > USB_TIMER) {
         usb_timer = HAL_GetTick();
         for (uint8_t i = 0; i < MAX_RELAYS; i++)
         {
             if (!relay[i].ready) continue;
-
             float v = voltage_buf[i];
             float c = current_buf[i];
             float t = temp_buf[i];
@@ -125,6 +126,7 @@ void user_loop()
 
             char msg[128];
 
+            // convert float readings into integer and fractional parts for USB transmission
             int v_i = (int)(v / 1000);
             int v_f = (int)(v - v_i * 1000);
 
@@ -149,48 +151,17 @@ void user_loop()
                 t_i, t_f,
                 oc
             );
-
             CDC_Transmit_FS((uint8_t*)msg, strlen(msg));
             HAL_Delay(5); // small delay to avoid USB buffer overflow
         }
     }
-    // if (HAL_GetTick() - screen_timer > SCREEN_TIMER) {
-    //     id = INA228_getDieID(&ina228);
-    //     oc = OC_check();
-    //     screen_timer = HAL_GetTick();
-    //     ssd1306_DisplayData();
-    // }
 }
 
-// Automated Check Function at startup
-// void Automated_Check() {
-//     // Implement automated checks needed at startup
-//     ssd1306_DisplayENTestMsg();
-//     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET); // Set PA5 high to enable relay
-//     HAL_Delay(500); // Wait for relay to turn on
-//     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET); // Set PA5 low to test latching functionality
-//     HAL_Delay(500); // Wait for relay to latch
-//     if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7) == GPIO_PIN_RESET) {
-//         user_error_handler(); // Relay did not enable successfully, handle error
-//     }
-//     else{
-//         EN_TEST = true;
-//         ssd1306_DisplayENTestMsg();
-//     }
-//     ssd1306_DisplayOCTestMsg();
-//     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET); // Set PA6 high to trigger OC Test
-//     HAL_Delay(500); // Wait for OC test to register
-//     if ((HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0) == GPIO_PIN_RESET) || (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7) == GPIO_PIN_SET)) {
-//         user_error_handler(); // Proetction did not trigger, handle error
-//     }
-//     else{
-//         OC_TEST = true;
-//         ssd1306_DisplayOCTestMsg();
-//     }
-//     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET); // Reset OC Test
-//     HAL_Delay(500); // Wait for system to stabilize
-// }
-
+/** @brief Check the presence of relays on the I2C bus based on a fixed configuration list and send the results over USB.
+ *  Future improvement: the list could be dynamically generated based on CAN messages from the PLC
+ *  @param void
+ *  @retval void
+ */
 void Relay_CheckPresence(void)
 {
     char msg[64];
@@ -227,232 +198,30 @@ void Relay_CheckPresence(void)
     HAL_Delay(5);
 }
 
-// Overcurrent setting check function
-int OC_check() {
-    uint16_t reading = 0;
-    int oc_setting = 0;
-
-    HAL_ADC_Start(&hadc3);
-    HAL_ADC_PollForConversion(&hadc3, 10);
-    reading = HAL_ADC_GetValue(&hadc3);
-    HAL_ADC_Stop(&hadc3);
-
-    if (reading >= 700 && reading <= 900)
-        oc_setting = 5;
-    else if (reading >= 1400 && reading <= 1600)
-        oc_setting = 10;
-    else if (reading >= 1850 && reading <= 2050)
-        oc_setting = 20;
-    else if (reading >= 2150 && reading <= 2350)
-        oc_setting = 30;
-    else
-        oc_setting = 0;
-
-    return oc_setting;
-}
-
-//	SSD1306 Data Display
-//
-/**
- * @brief Display normal operation screen
- * 
+/** @brief EXTI9_5_IRQHandler - Interrupt handler for EXTI lines 9 to 5
+ *  @param void
+ *  @retval void
  */
-
-// void ssd1306_DisplayData() {
-// 	char buff[64];
-// 	uint16_t integer, fraction;
-//     if (FAULT_CHECK){
-//         FAULT_TYPE = INA228_checkFault(&relay[0].ina);
-//         FAULT_CHECK = 0;
-//     }
-// 	ssd1306_Fill(White);
-//     if (PG == GPIO_PIN_RESET) {
-//         if (FAULT == GPIO_PIN_SET){
-//             if (FAULT_TYPE == 1){
-//                 ssd1306_Fill(White);
-//                 ssd1306_SetCursor(2,31);
-//                 ssd1306_WriteString("Overcurrent", Font_6x8, Black);
-//                 ssd1306_UpdateScreen();
-//             }
-//             else if(FAULT_TYPE == 2){
-//                 ssd1306_Fill(White);
-//                 ssd1306_SetCursor(2,31);
-//                 ssd1306_WriteString("Overvoltage", Font_6x8, Black);
-//                 ssd1306_UpdateScreen();
-//             }
-//             else if(FAULT_TYPE == 3){
-//                 ssd1306_Fill(White);
-//                 ssd1306_SetCursor(2,31);
-//                 ssd1306_WriteString("Undervoltage", Font_6x8, Black);
-//                 ssd1306_UpdateScreen();
-//             }
-//             else{
-//                 ssd1306_Fill(White);
-//                 ssd1306_SetCursor(2,31);
-//                 ssd1306_WriteString("Unknown Fault: ", Font_6x8, Black);
-//                 integer = (int) FAULT_TYPE;
-//                 snprintf(buff, sizeof(buff), "%d", FAULT_TYPE);
-//                 ssd1306_WriteString(buff, Font_6x8, Black);
-//                 ssd1306_UpdateScreen();
-//             }
-//         }
-//         else{
-//                 ssd1306_Fill(White);
-//                 ssd1306_SetCursor(2,31);
-//                 ssd1306_WriteString("Channel Disabled", Font_6x8, Black);
-//                 ssd1306_UpdateScreen();
-//         }
-//     }
-//     else{
-//         // ssd1306_SetCursor(2,5);
-// 	    // ssd1306_WriteString("PG:  ", Font_6x8, Black);
-//         // integer = PG ? 1 : 0;
-//         // snprintf(buff, sizeof(buff), "%d", integer);
-//         // ssd1306_WriteString(buff, Font_6x8, Black);
-
-
-//         // ssd1306_SetCursor(70,5);
-// 	    // ssd1306_WriteString("Fault:  ", Font_6x8, Black);
-//         // integer = FAULT ? 1 : 0;
-//         // snprintf(buff, sizeof(buff), "%d", integer);
-//         // ssd1306_WriteString(buff, Font_6x8, Black);
-
-//         ssd1306_SetCursor(2,5);
-// 	    ssd1306_WriteString("Board ID:  ", Font_6x8, Black);
-//         integer = id;
-//         snprintf(buff, sizeof(buff), "%d", integer);
-//         ssd1306_WriteString(buff, Font_6x8, Black);
-
-//         ssd1306_SetCursor(2,20);
-// 	    ssd1306_WriteString("Voltage:", Font_6x8, Black);
-// 	    integer = (int) voltage/1000;
-// 	    fraction = (int)(voltage - integer*1000);
-//         snprintf(buff, sizeof(buff), "%d.%03d V", integer, fraction);
-//         ssd1306_WriteString(buff, Font_6x8, Black);
-
-//         // ssd1306_SetCursor(2,20);
-// 	    // ssd1306_WriteString("Shunt:", Font_6x8, Black);
-// 	    // integer = (int) shunt_voltage/1000;
-//         // fraction = (int)(shunt_voltage - integer*1000);
-//         // snprintf(buff, sizeof(buff), "%d.%02d V", integer, fraction);
-//         // ssd1306_WriteString(buff, Font_6x8, Black);
-
-//         ssd1306_SetCursor(2,30);
-// 	    ssd1306_WriteString("Current:", Font_6x8, Black);
-// 	    integer = (int) current/1000;
-// 	    fraction = (int)(current - integer*1000);
-//         snprintf(buff, sizeof(buff), "%d.%03d A", integer, fraction);
-//         ssd1306_WriteString(buff, Font_6x8, Black);
-
-//         ssd1306_SetCursor(2,40);
-// 	    ssd1306_WriteString("Temperature:", Font_6x8, Black);
-// 	    integer = (int) temp/1000;
-// 	    fraction = (int)((temp - integer*1000));
-//         snprintf(buff, sizeof(buff), "%d.%03d C", integer, fraction);
-//         ssd1306_WriteString(buff, Font_6x8, Black);
-
-//         ssd1306_SetCursor(2,50);
-// 	    ssd1306_WriteString("OC SETTING:", Font_6x8, Black);
-//         integer = oc;
-//         snprintf(buff, sizeof(buff), "%d A", integer);
-//         ssd1306_WriteString(buff, Font_6x8, Black);
-
-//         ssd1306_UpdateScreen();
-//     }
-// }
-
-/**
- * @brief Display Turning On Process Screen
- * 
- */
-// void ssd1306_DisplayOnMsg() {
-// 	ssd1306_Fill(White);
-//     ssd1306_SetCursor(2,31);
-// 	ssd1306_WriteString("Waiting for Relay PCB Connection ...", Font_6x8, Black);
-// 	ssd1306_UpdateScreen();
-// 	HAL_Delay(1000);
-// }
-
-/**
- * @brief Display Ready Screen
- * 
- */
-// void ssd1306_DisplayReadyMsg() {
-// 	ssd1306_Fill(White);
-//     ssd1306_SetCursor(2,31);
-// 	ssd1306_WriteString("Ready to Start Monitoring", Font_6x8, Black);
-// 	ssd1306_UpdateScreen();
-// 	HAL_Delay(1000);
-// }
-
-/**
- * @brief Display Turning Off Process Screen
- * 
- */
-// void ssd1306_DisplayOffMsg() {
-// 	ssd1306_Fill(White);
-//     ssd1306_SetCursor(2,31);
-// 	ssd1306_WriteString("TURNING OFF PMB ...", Font_6x8, Black);
-// 	ssd1306_UpdateScreen();
-// 	HAL_Delay(1000);
-// }
-
-/**
- * @brief Display ERROR Screen
- * 
- */
-// void ssd1306_DisplayErrorMsg() {
-// 	ssd1306_Fill(White);
-//     ssd1306_SetCursor(2,31);
-// 	ssd1306_WriteString("ERROR: Init Failure", Font_6x8, Black);
-// 	ssd1306_UpdateScreen();
-// 	HAL_Delay(1000);
-// }
-
-/**
- * @brief Display EN Test Screen
- * 
- */
-// void ssd1306_DisplayENTestMsg() {
-//     ssd1306_Fill(White);
-//     ssd1306_SetCursor(2,31);
-//     if (EN_TEST){
-//         ssd1306_WriteString("TESTING EN: PASS", Font_6x8, Black);
-//     }
-//     else{
-//         ssd1306_WriteString("TESTING EN", Font_6x8, Black);
-//     }
-// 	ssd1306_UpdateScreen();
-// 	HAL_Delay(1000);
-// }
-
-/**
- * @brief Display OC Test Screen
- * 
- */
-// void ssd1306_DisplayOCTestMsg() {
-// 	ssd1306_Fill(White);
-//     ssd1306_SetCursor(2,31);
-//     if (OC_TEST){
-//         ssd1306_WriteString("TESTING OC: PASS", Font_6x8, Black);
-//     }
-//     else{
-//         ssd1306_WriteString("TESTING OC PROTECTION", Font_6x8, Black);
-//     }
-// 	ssd1306_UpdateScreen();
-// 	HAL_Delay(1000);
-// }
-
 void EXTI9_5_IRQHandler(void)
 {
     HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_7);
 }
+
+/** @brief EXTI0_IRQHandler - Interrupt handler for EXTI line 0
+ *  @param void
+ *  @retval void
+ */
 
 void EXTI0_IRQHandler(void)
 {
     HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_0);
 }
 
+/** @brief HAL_GPIO_EXTI_Callback - Callback function for GPIO EXTI interrupts
+ *  Future improvement: Implement a similar fault interrupt structure for all relay slots instead of hardcoding for one PG and one FAULT pin
+ *  @param GPIO_Pin The GPIO pin that triggered the interrupt.
+ *  @retval void
+ */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
     //FAULT_TYPE = INA228_checkFault(&ina228);
@@ -467,6 +236,5 @@ void user_error_handler()
     {
     }
 }
-
 
 // ADD OTHER HELPER FUNCTIONS HERE
