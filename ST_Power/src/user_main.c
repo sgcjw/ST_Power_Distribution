@@ -6,30 +6,29 @@
 extern ADC_HandleTypeDef hadc1;
 
 // ADD YOUR INCLUDES HERE
-uint32_t screen_timer = 0;
-uint32_t hb_timer = 0;
-uint32_t monitor_timer = 0;
-uint32_t usb_timer = 0;
+uint32_t screen_timer = 0; // Timer for screen updates
+uint32_t hb_timer = 0; // Timer for heartbeat LED
+uint32_t monitor_timer = 0; // Timer for monitoring PG, FAULT, and reading sensor data
+uint32_t usb_timer = 0; // Timer for USB data transmission
 
-bool PG = true;
+bool PG = true; 
 bool FAULT = false;
 bool EN_TEST = false;
 bool OC_TEST = false;
 
-INA228_t ina228;
+INA228_t ina228; 
 uint8_t ina228_address = 0x40;
 float maxcurrent = 30.0;
 float shunt = 0.001f;
-uint8_t bvct = 3; // us bus voltage conversion time
-uint8_t svct = 5; // us shunt voltage conversion time
-uint8_t tct = 3;  // us temperature conversion time
+uint8_t bvct = 3; // 280us bus voltage conversion time
+uint8_t svct = 5; // 1052us shunt voltage conversion time
+uint8_t tct = 3;  // 280us temperature conversion time
 uint16_t ppm = 200; // 200 ppm temperature coefficent
 uint16_t id = 0;
 float current = 0;
 float fault_current = 0;
 float voltage = 0;
 float fault_voltage = 0;
-// float shunt_voltage = 0;
 float temp = 0;
 int oc = 0;
 
@@ -37,13 +36,12 @@ int oc = 0;
 void user_setup()
 {
     MX_USB_DEVICE_Init();    // MUST be called after MX_USB_PCD_Init()
-    // ADD SETUP CODE HERE
-    ssd1306_Init();
-    ssd1306_DisplayOnMsg();
+    ssd1306_Init(); // Initialize the SSD1306 display
+    ssd1306_DisplayOnMsg(); // Display initial message while waiting for relay PCB connection
     if (INA228_Init(&ina228, &hi2c1, ina228_address, maxcurrent, shunt, bvct, svct, tct, ppm) == 1) {
-        ssd1306_DisplayReadyMsg();
+        ssd1306_DisplayReadyMsg(); // Display ready message if INA228 initializes successfully
     }
-    Automated_Check();
+    Automated_Check(); // Run automated checks at startup
     __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_7);
     __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_0);
     HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
@@ -52,26 +50,26 @@ void user_setup()
 
 void user_loop()
 {
-    // ADD LOOP CODE HERE
+    // Heartbeat LED toggle every HB_TIMER milliseconds
     if (HAL_GetTick() - hb_timer > HB_TIMER) {
         hb_timer = HAL_GetTick();
         HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
     }
+    // Monitor PG, FAULT, and read sensor data every MONITOR_TIMER milliseconds
     if (HAL_GetTick() - monitor_timer > MONITOR_TIMER) {
         monitor_timer = HAL_GetTick();
-        // PG = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7);
-        // FAULT = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0);
         current = INA228_ReadCurrent(&ina228, maxcurrent);
         voltage = INA228_ReadBusVoltage(&ina228);
-        // shunt_voltage = INA228_ReadShuntVoltage(&ina228)/0.004f;
         temp = INA228_getTemperature(&ina228);
     }
+    // Update display every SCREEN_TIMER milliseconds
     if (HAL_GetTick() - screen_timer > SCREEN_TIMER) {
         id = INA228_getDieID(&ina228);
         oc = OC_check();
         screen_timer = HAL_GetTick();
         ssd1306_DisplayData();
     }
+    // Transmit data over USB every USB_TIMER milliseconds
     if (HAL_GetTick() - usb_timer > USB_TIMER) {
         usb_timer = HAL_GetTick();
         char string[128];
@@ -88,8 +86,6 @@ void user_loop()
         snprintf(string, sizeof(string),
             "Voltage: %d.%03d V\r\n"
             "Current: %d.%03d A\r\n"
-            // for Temp Recording
-            // "%d.%03d \r\n", 
             "Temp:    %d.%03d C\r\n",
             v_i, v_f,
             c_i, c_f,
@@ -99,7 +95,13 @@ void user_loop()
     }
 }
 
-// Automated Check Function at startup
+/**
+ * @brief Perform automated checks at startup
+ * @details This function performs the following checks:
+ * 1. EN Test: Verifies that the relay can be enabled and latched properly by toggling the enable pin and checking the status pin.
+ * 2. OC Test: Verifies that the overcurrent protection triggers correctly by simulating an overcurrent condition and checking the fault pin and status pin.
+ */
+
 void Automated_Check() {
     // Implement automated checks needed at startup
     ssd1306_DisplayENTestMsg();
@@ -128,7 +130,18 @@ void Automated_Check() {
     HAL_Delay(500); // Wait for system to stabilize
 }
 
-// Overcurrent setting check function
+/**
+ * @brief Check overcurrent setting
+ * @return Overcurrent setting in amperes
+ * @details This function reads the ADC value corresponding to the overcurrent setting and determines the OC setting based on predefined thresholds.
+ * The thresholds are defined as follows:
+ * - 5A: ADC reading between 700 and 900
+ * - 10A: ADC reading between 1400 and 1600
+ * - 20A: ADC reading between 1850 and 2050
+ * - 30A: ADC reading between 2150 and 2350
+ * If the reading does not fall within any of these ranges, it returns 0.
+ */
+
 int OC_check() {
     uint16_t reading = 0;
     int oc_setting = 0;
@@ -147,13 +160,14 @@ int OC_check() {
         oc_setting = 30;
     }
     else {
-        oc_setting = 0; // No OC Setting 
+        oc_setting = 0; 
     }
-    return oc_setting; // Return in Amperes
+    return oc_setting;
 }
 
 //	SSD1306 Data Display
 //
+
 /**
  * @brief Display normal operation screen
  * 
@@ -220,19 +234,6 @@ void ssd1306_DisplayData() {
         }
     }
     else{
-        // ssd1306_SetCursor(2,5);
-	    // ssd1306_WriteString("PG:  ", Font_6x8, Black);
-        // integer = PG ? 1 : 0;
-        // snprintf(buff, sizeof(buff), "%d", integer);
-        // ssd1306_WriteString(buff, Font_6x8, Black);
-
-
-        // ssd1306_SetCursor(70,5);
-	    // ssd1306_WriteString("Fault:  ", Font_6x8, Black);
-        // integer = FAULT ? 1 : 0;
-        // snprintf(buff, sizeof(buff), "%d", integer);
-        // ssd1306_WriteString(buff, Font_6x8, Black);
-
         ssd1306_SetCursor(2,5);
 	    ssd1306_WriteString("Board ID:  ", Font_6x8, Black);
         integer = id;
@@ -245,13 +246,6 @@ void ssd1306_DisplayData() {
 	    fraction = (int)(voltage - integer*1000);
         snprintf(buff, sizeof(buff), "%d.%03d V", integer, fraction);
         ssd1306_WriteString(buff, Font_6x8, Black);
-
-        // ssd1306_SetCursor(2,20);
-	    // ssd1306_WriteString("Shunt:", Font_6x8, Black);
-	    // integer = (int) shunt_voltage/1000;
-        // fraction = (int)(shunt_voltage - integer*1000);
-        // snprintf(buff, sizeof(buff), "%d.%02d V", integer, fraction);
-        // ssd1306_WriteString(buff, Font_6x8, Black);
 
         ssd1306_SetCursor(2,30);
 	    ssd1306_WriteString("Current:", Font_6x8, Black);
@@ -272,7 +266,6 @@ void ssd1306_DisplayData() {
         integer = oc;
         snprintf(buff, sizeof(buff), "%d A", integer);
         ssd1306_WriteString(buff, Font_6x8, Black);
-
         ssd1306_UpdateScreen();
     }
 }
@@ -300,18 +293,6 @@ void ssd1306_DisplayReadyMsg() {
 	ssd1306_UpdateScreen();
 	HAL_Delay(1000);
 }
-
-/**
- * @brief Display Turning Off Process Screen
- * 
- */
-// void ssd1306_DisplayOffMsg() {
-// 	ssd1306_Fill(White);
-//     ssd1306_SetCursor(2,31);
-// 	ssd1306_WriteString("TURNING OFF PMB ...", Font_6x8, Black);
-// 	ssd1306_UpdateScreen();
-// 	HAL_Delay(1000);
-// }
 
 /**
  * @brief Display ERROR Screen
@@ -386,6 +367,3 @@ void user_error_handler()
         ssd1306_DisplayErrorMsg();
     }
 }
-
-
-// ADD OTHER HELPER FUNCTIONS HERE
